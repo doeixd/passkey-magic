@@ -1,0 +1,74 @@
+{
+  "name": "passkey-magic",
+  "version": "0.1.0",
+  "description": "Passkey-first authentication with QR cross-device login and magic link fallback",
+  "type": "module",
+  "exports": {
+    "./server": {
+      "import": "./dist/server/index.mjs",
+      "types": "./dist/server/index.d.mts"
+    },
+    "./client": {
+      "import": "./dist/client/index.mjs",
+      "types": "./dist/client/index.d.mts"
+    },
+    "./adapters/memory": {
+      "import": "./dist/adapters/memory.mjs",
+      "types": "./dist/adapters/memory.d.mts"
+    },
+    "./adapters/unstorage": {
+      "import": "./dist/adapters/unstorage.mjs",
+      "types": "./dist/adapters/unstorage.d.mts"
+    },
+    "./nitro": {
+      "import": "./dist/nitro/index.mjs",
+      "types": "./dist/nitro/index.d.mts"
+    },
+    "./better-auth": {
+      "import": "./dist/better-auth/index.mjs",
+      "types": "./dist/better-auth/index.d.mts"
+    },
+    "./better-auth/client": {
+      "import": "./dist/better-auth/client.mjs",
+      "types": "./dist/better-auth/client.d.mts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "passkey",
+    "webauthn",
+    "auth",
+    "magic-link",
+    "qr",
+    "fido2"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.0",
+    "unstorage": "^1.17.4",
+    "uqr": "^0.1.2"
+  },
+  "peerDependencies": {
+    "better-auth": ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "better-auth": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "better-auth": "^1.5.5",
+    "tsdown": "^0.21.4",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
+  }
+}
