@@ -374,6 +374,7 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
         userId,
         email: user.email,
         userName: userName ?? user.email ?? userId,
+        allowExistingUser: true,
       })
 
       return { options }

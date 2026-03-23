@@ -137,6 +137,24 @@ describe('createAuth', () => {
         auth.sendMagicLink({ email: 'test@example.com' }),
       ).rejects.toThrow('Magic link blocked by hook')
     })
+
+    it('blocks unauthenticated passkey registration for an existing user id', async () => {
+      const auth = makeAuth()
+      await storage.createUser({ id: 'victim', email: 'victim@example.com', createdAt: new Date() })
+
+      await expect(
+        auth.generateRegistrationOptions({ userId: 'victim' }),
+      ).rejects.toThrow('existing user without authentication')
+    })
+
+    it('stores user-bound auth challenge metadata for scoped passkey sign-in', async () => {
+      const auth = makeAuth()
+      const { options } = await auth.generateAuthenticationOptions({ userId: 'u1' })
+      const stored = await storage.getChallenge(`auth:${options.challenge}`)
+
+      expect(stored).toContain('"userId":"u1"')
+      expect(stored).toContain(options.challenge)
+    })
   })
 
   // ── Events ──

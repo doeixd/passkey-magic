@@ -170,29 +170,37 @@ function createBridgedStorage(adapter: BetterAuthAdapter): StorageAdapter {
       return user
     },
     async getUserById(id) {
-      const row = await adapter.findOne<any>({
-        model: 'user',
-        where: [{ field: 'id', value: id }],
-      })
-      if (!row) return null
-      return {
-        id: row.id,
-        email: row.email ?? undefined,
-        createdAt: new Date(row.createdAt),
-        metadata: deserializeMetadata(row.metadata),
+      try {
+        const row = await adapter.findOne<any>({
+          model: 'user',
+          where: [{ field: 'id', value: id }],
+        })
+        if (!row) return null
+        return {
+          id: row.id,
+          email: row.email ?? undefined,
+          createdAt: new Date(row.createdAt),
+          metadata: deserializeMetadata(row.metadata),
+        }
+      } catch {
+        return null
       }
     },
     async getUserByEmail(email) {
-      const row = await adapter.findOne<any>({
-        model: 'user',
-        where: [{ field: 'email', value: email }],
-      })
-      if (!row) return null
-      return {
-        id: row.id,
-        email: row.email ?? undefined,
-        createdAt: new Date(row.createdAt),
-        metadata: deserializeMetadata(row.metadata),
+      try {
+        const row = await adapter.findOne<any>({
+          model: 'user',
+          where: [{ field: 'email', value: email }],
+        })
+        if (!row) return null
+        return {
+          id: row.id,
+          email: row.email ?? undefined,
+          createdAt: new Date(row.createdAt),
+          metadata: deserializeMetadata(row.metadata),
+        }
+      } catch {
+        return null
       }
     },
     async updateUser(id, update) {

@@ -19,6 +19,7 @@ export interface PasskeyManager {
     userId?: string
     email?: string
     userName?: string
+    allowExistingUser?: boolean
   }): Promise<{
     options: PublicKeyCredentialCreationOptionsJSON
     userId: string
@@ -51,6 +52,11 @@ export function createPasskeyManager(
     async generateRegistrationOptions(params) {
       const userId = params.userId ?? generateId()
       const userName = params.userName ?? params.email ?? userId
+      const existingUser = await storage.getUserById(userId)
+
+      if (existingUser && !params.allowExistingUser) {
+        throw new Error('Cannot start registration for an existing user without authentication')
+      }
 
       const existingCreds = await storage.getCredentialsByUserId(userId)
 
@@ -68,16 +74,22 @@ export function createPasskeyManager(
         },
       })
 
-      await storage.storeChallenge(`reg:${userId}`, options.challenge, challengeTTL)
+      await storage.storeChallenge(
+        `reg:${userId}`,
+        JSON.stringify({ challenge: options.challenge, allowExistingUser: params.allowExistingUser === true }),
+        challengeTTL,
+      )
 
       return { options, userId }
     },
 
     async verifyRegistration({ userId, response }) {
-      const expectedChallenge = await storage.getChallenge(`reg:${userId}`)
-      if (!expectedChallenge) {
+      const storedChallenge = await storage.getChallenge(`reg:${userId}`)
+      if (!storedChallenge) {
         throw new Error('Registration challenge expired or not found')
       }
+
+      const { challenge: expectedChallenge, allowExistingUser } = parseRegistrationChallenge(storedChallenge)
 
       const verification = await verifyRegistrationResponse({
         response,
@@ -96,6 +108,9 @@ export function createPasskeyManager(
         verification.registrationInfo
 
       let user = await storage.getUserById(userId)
+      if (user && !allowExistingUser) {
+        throw new Error('Cannot register a passkey for an existing user without authentication')
+      }
       if (!user) {
         user = await storage.createUser({
           id: userId,
@@ -136,8 +151,11 @@ export function createPasskeyManager(
         userVerification: 'preferred',
       })
 
-      // Store challenge keyed by its value (for discoverable credentials where we don't know userId)
-      await storage.storeChallenge(`auth:${options.challenge}`, options.challenge, challengeTTL)
+      await storage.storeChallenge(
+        `auth:${options.challenge}`,
+        JSON.stringify({ challenge: options.challenge, userId: params?.userId }),
+        challengeTTL,
+      )
 
       return { options }
     },
@@ -153,9 +171,14 @@ export function createPasskeyManager(
         new TextDecoder().decode(base64urlToBuffer(response.response.clientDataJSON)),
       ) as { challenge: string }
 
-      const storedChallenge = await storage.getChallenge(`auth:${clientData.challenge}`)
-      if (!storedChallenge) {
+      const storedAuthChallenge = await storage.getChallenge(`auth:${clientData.challenge}`)
+      if (!storedAuthChallenge) {
         throw new Error('Authentication challenge expired or not found')
+      }
+
+      const { challenge: storedChallenge, userId: expectedUserId } = parseAuthenticationChallenge(storedAuthChallenge)
+      if (expectedUserId && credential.userId !== expectedUserId) {
+        throw new Error('Authentication credential does not match the requested user')
       }
 
       const verification = await verifyAuthenticationResponse({
@@ -189,6 +212,29 @@ export function createPasskeyManager(
       return { user }
     },
   }
+}
+
+function parseRegistrationChallenge(value: string): { challenge: string; allowExistingUser: boolean } {
+  try {
+    const parsed = JSON.parse(value) as { challenge?: string; allowExistingUser?: boolean }
+    if (typeof parsed.challenge === 'string') {
+      return { challenge: parsed.challenge, allowExistingUser: parsed.allowExistingUser === true }
+    }
+  } catch {}
+  return { challenge: value, allowExistingUser: false }
+}
+
+function parseAuthenticationChallenge(value: string): { challenge: string; userId?: string } {
+  try {
+    const parsed = JSON.parse(value) as { challenge?: string; userId?: string }
+    if (typeof parsed.challenge === 'string') {
+      return {
+        challenge: parsed.challenge,
+        userId: typeof parsed.userId === 'string' ? parsed.userId : undefined,
+      }
+    }
+  } catch {}
+  return { challenge: value }
 }
 
 function base64urlToBuffer(base64url: string): ArrayBuffer {
