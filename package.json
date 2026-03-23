@@ -1,6 +1,6 @@
 {
   "name": "passkey-magic",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Passkey-first authentication with QR cross-device login and magic link fallback",
   "type": "module",
   "sideEffects": false,

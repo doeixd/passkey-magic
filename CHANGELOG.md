@@ -6,6 +6,8 @@ The format is based on Keep a Changelog and the project aims to follow Semantic 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-23
+
 ### Added
 - Grouped server and client APIs for passkeys, QR, magic links, and accounts.
 - Typed metadata support for users and credentials, including end-to-end metadata generics.
