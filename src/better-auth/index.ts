@@ -652,21 +652,6 @@ export function passkeyMagicPlugin(options: PasskeyMagicPluginOptions) {
         },
       ),
 
-      passkeyMagicAccountByEmail: createAuthEndpoint(
-        '/passkey-magic/account/by-email',
-        {
-          method: 'POST',
-          body: z.object({
-            email: z.string(),
-          }),
-        },
-        async (ctx) => {
-          const auth = getAuth(ctx)
-          const user = await auth.accounts.getByEmail(ctx.body.email)
-          return ctx.json({ user })
-        },
-      ),
-
       passkeyMagicAccountCanLinkEmail: createAuthEndpoint(
         '/passkey-magic/account/can-link-email',
         {

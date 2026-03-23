@@ -646,14 +646,6 @@ describe('createAuth', () => {
         expiresAt: new Date(Date.now() + 10000), createdAt: new Date(),
       })
 
-      const byEmailRes = await handler(new Request('http://localhost/auth/account/by-email', {
-        method: 'POST',
-        body: JSON.stringify({ email: 'a@b.com' }),
-        headers: { 'Content-Type': 'application/json' },
-      }))
-      expect(byEmailRes.status).toBe(200)
-      expect((await byEmailRes.json()).user.id).toBe('u1')
-
       const canLinkRes = await handler(new Request('http://localhost/auth/account/can-link-email', {
         method: 'POST',
         body: JSON.stringify({ email: 'free@example.com' }),

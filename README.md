@@ -183,9 +183,6 @@ if (canLink.ok) {
 }
 
 await auth.accounts.unlinkEmail({ userId })
-
-// Public lookup without linking
-const maybeUser = await auth.accounts.getByEmail('user@example.com')
 ```
 
 On the client, the same account workflow is available for the current authenticated user:

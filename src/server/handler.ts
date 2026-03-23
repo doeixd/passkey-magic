@@ -41,7 +41,6 @@ interface HandlerOptions {
  * POST /account/link-email           — Link email to account (authed)
  * POST /account/unlink-email         — Unlink email from account (authed)
  * POST /account/can-link-email       — Check if current user can link email (authed)
- * POST /account/by-email             — Find user by email
  * POST /account/email-available      — Check email availability
  * DELETE /account                    — Delete account (authed)
  * ```
@@ -287,12 +286,6 @@ export function createHandler(
           email: expectString(body, 'email'),
         })
         return json(result)
-      }
-
-      if (path === '/account/by-email' && request.method === 'POST') {
-        const body = await readJSON(request)
-        const user = await auth.accounts.getByEmail(expectString(body, 'email'))
-        return json({ user })
       }
 
       if (path === '/account/email-available' && request.method === 'POST') {

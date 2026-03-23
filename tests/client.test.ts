@@ -7,13 +7,6 @@ describe('createClient grouped helpers', () => {
       if (endpoint === '/account') {
         return { user: { id: 'u1', email: 'current@example.com', createdAt: new Date() } }
       }
-      if (endpoint === '/account/by-email') {
-        return {
-          user: (body as { email: string }).email === 'current@example.com'
-            ? { id: 'u1', email: 'current@example.com', createdAt: new Date() }
-            : null,
-        }
-      }
       if (endpoint === '/account/email-available') {
         return { available: (body as { email: string }).email !== 'taken@example.com' }
       }
@@ -38,8 +31,6 @@ describe('createClient grouped helpers', () => {
     const client = createClient({ request: request as any })
 
     expect((await client.accounts.get()).user.id).toBe('u1')
-    expect((await client.accounts.getByEmail('current@example.com')).user?.id).toBe('u1')
-    expect((await client.accounts.getByEmail('missing@example.com')).user).toBeNull()
     expect(await client.accounts.isEmailAvailable('free@example.com')).toBe(true)
     expect(await client.accounts.canLinkEmail('current@example.com')).toEqual({ ok: true })
     expect(await client.accounts.canLinkEmail('taken@example.com')).toEqual({

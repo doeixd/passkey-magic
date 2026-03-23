@@ -116,13 +116,12 @@ describe('passkeyMagicPlugin', () => {
 
     it('defines account identity endpoints', () => {
       const plugin = makePlugin()
-      expect(plugin.endpoints.passkeyMagicAccountByEmail).toBeDefined()
       expect(plugin.endpoints.passkeyMagicAccountCanLinkEmail).toBeDefined()
     })
 
-    it('has 17 total endpoints', () => {
+    it('has 16 total endpoints', () => {
       const plugin = makePlugin()
-      expect(Object.keys(plugin.endpoints)).toHaveLength(17)
+      expect(Object.keys(plugin.endpoints)).toHaveLength(16)
     })
   })
 })
@@ -138,5 +137,37 @@ describe('passkeyMagicClientPlugin', () => {
   it('has $InferServerPlugin property', () => {
     const client = passkeyMagicClientPlugin()
     expect(client.$InferServerPlugin).toBeDefined()
+  })
+
+  it('exposes grouped client actions', async () => {
+    const client = passkeyMagicClientPlugin()
+    const $fetch = vi.fn(async () => ({ ok: true }))
+    const actions = client.getActions?.($fetch as any)
+
+    expect(actions?.passkeyMagic.register.options).toBeTypeOf('function')
+    expect(actions?.passkeyMagic.authenticate.verify).toBeTypeOf('function')
+    expect(actions?.passkeyMagic.passkeys.list).toBeTypeOf('function')
+    expect(actions?.passkeyMagic.qr.status).toBeTypeOf('function')
+    expect(actions?.passkeyMagic.magicLinks.send).toBeTypeOf('function')
+    expect(actions?.passkeyMagic.accounts.canLinkEmail).toBeTypeOf('function')
+
+    await actions?.passkeyMagic.qr.status('qr-1')
+    await actions?.passkeyMagic.accounts.canLinkEmail({ email: 'user@example.com' })
+
+    expect($fetch).toHaveBeenCalledWith('/passkey-magic/qr/status', {
+      method: 'GET',
+      query: { sessionId: 'qr-1' },
+    })
+    expect($fetch).toHaveBeenCalledWith('/passkey-magic/account/can-link-email', {
+      method: 'POST',
+      body: { email: 'user@example.com' },
+    })
+  })
+
+  it('declares path methods for typed GET routes', () => {
+    const client = passkeyMagicClientPlugin()
+    expect(client.pathMethods).toEqual({
+      '/passkey-magic/qr/status': 'GET',
+    })
   })
 })
