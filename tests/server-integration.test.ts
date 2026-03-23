@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { createStorage } from 'unstorage'
 import { createAuth } from '../src/server/index.js'
+import { createUnstorageRateLimiter } from '../src/server/rate-limit.js'
 import { memoryAdapter } from '../src/adapters/memory.js'
 import type { EmailAdapter, StorageAdapter } from '../src/types.js'
 
@@ -647,6 +649,36 @@ describe('createAuth', () => {
       const second = await handler(new Request('http://localhost/auth/qr/create', { method: 'POST' }))
       expect(first.status).toBe(200)
       expect(second.status).toBe(200)
+    })
+
+    it('supports a shared unstorage-backed rate limiter', async () => {
+      const limiterStorage = createStorage()
+      const limiter = createUnstorageRateLimiter(limiterStorage)
+      const auth = makeAuth({
+        email: { sendMagicLink: vi.fn(async () => {}) } as EmailAdapter,
+        magicLinkURL: 'http://localhost:3000/auth/verify',
+        rateLimit: {
+          limiter,
+          rules: {
+            'magicLink.send': { limit: 1, windowMs: 60_000 },
+          },
+        },
+      }) as any
+      const handler = auth.createHandler()
+
+      const first = await handler(new Request('http://localhost/auth/magic-link/send', {
+        method: 'POST',
+        body: JSON.stringify({ email: 'shared@example.com' }),
+        headers: { 'Content-Type': 'application/json' },
+      }))
+      expect(first.status).toBe(200)
+
+      const second = await handler(new Request('http://localhost/auth/magic-link/send', {
+        method: 'POST',
+        body: JSON.stringify({ email: 'shared@example.com' }),
+        headers: { 'Content-Type': 'application/json' },
+      }))
+      expect(second.status).toBe(429)
     })
 
     it('handles QR session lifecycle', async () => {

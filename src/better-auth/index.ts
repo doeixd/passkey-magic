@@ -1,5 +1,5 @@
 import { createAuth } from '../server/index.js'
-import type { StorageAdapter, EmailAdapter, Credential, MetadataObject, QRSession } from '../types.js'
+import type { StorageAdapter, EmailAdapter, Credential, MetadataObject, QRSession, AuthRateLimitConfig } from '../types.js'
 import type { BetterAuthPlugin } from 'better-auth'
 import type { BetterAuthClientPlugin } from 'better-auth'
 import { createAuthEndpoint, sessionMiddleware } from 'better-auth/api'
@@ -21,6 +21,7 @@ export interface PasskeyMagicPluginOptions<
   challengeTTL?: number
   magicLinkTTL?: number
   qrSessionTTL?: number
+  rateLimit?: AuthRateLimitConfig
   mapUserMetadata?: (userRow: Record<string, unknown>) => TUserMetadata | undefined
   mapCredentialMetadata?: (value: unknown) => TCredentialMetadata | undefined
 }
@@ -541,6 +542,7 @@ export function passkeyMagicPlugin<
         challengeTTL: options.challengeTTL,
         magicLinkTTL: options.magicLinkTTL,
         qrSessionTTL: options.qrSessionTTL,
+        rateLimit: options.rateLimit,
       } as any)
     }
     return _auth

@@ -22,7 +22,7 @@ import { createPasskeyManager } from './passkey.js'
 import { createMagicLinkManager } from './magic-link.js'
 import { createQRSessionManager } from './qr-session.js'
 import { createHandler } from './handler.js'
-export { createMemoryRateLimiter } from './rate-limit.js'
+export { createMemoryRateLimiter, createUnstorageRateLimiter } from './rate-limit.js'
 
 export interface PasskeyNamespace<
   TUserMetadata extends MetadataObject = MetadataObject,

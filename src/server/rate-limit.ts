@@ -1,3 +1,4 @@
+import type { Storage } from 'unstorage'
 import type {
   AuthRateLimiter,
   RateLimitCheck,
@@ -19,6 +20,11 @@ const DEFAULT_RATE_LIMIT_RULES: Record<RateLimitRoute, RateLimitRule> = {
 interface Bucket {
   count: number
   resetAt: number
+}
+
+export interface UnstorageRateLimiterOptions {
+  /** Key prefix used inside unstorage. Defaults to `passkey-magic:ratelimit`. */
+  base?: string
 }
 
 /**
@@ -45,6 +51,45 @@ export function createMemoryRateLimiter(): AuthRateLimiter {
       }
 
       current.count += 1
+      return { allowed: true }
+    },
+  }
+}
+
+/**
+ * Shared fixed-window limiter backed by unstorage.
+ *
+ * This works across deployments that share the same unstorage backend.
+ * It is still a simple read-modify-write design, so for strict atomicity under
+ * very high contention you may want a custom limiter built on Redis/Lua or a
+ * database primitive.
+ */
+export function createUnstorageRateLimiter(
+  storage: Storage,
+  options: UnstorageRateLimiterOptions = {},
+): AuthRateLimiter {
+  const base = options.base ?? 'passkey-magic:ratelimit'
+  const keyOf = (key: string) => `${base}:${key}`
+
+  return {
+    async check({ key, limit, windowMs }: RateLimitCheck): Promise<RateLimitDecision> {
+      const now = Date.now()
+      const storageKey = keyOf(key)
+      const current = await storage.getItem<Bucket>(storageKey)
+
+      if (!current || typeof current.count !== 'number' || typeof current.resetAt !== 'number' || now >= current.resetAt) {
+        await storage.setItem(storageKey, { count: 1, resetAt: now + windowMs })
+        return { allowed: true }
+      }
+
+      if (current.count >= limit) {
+        return { allowed: false, retryAfterMs: Math.max(0, current.resetAt - now) }
+      }
+
+      await storage.setItem(storageKey, {
+        count: current.count + 1,
+        resetAt: current.resetAt,
+      })
       return { allowed: true }
     },
   }

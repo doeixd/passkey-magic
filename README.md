@@ -283,7 +283,8 @@ Sensitive public routes are rate-limited by default with an in-memory limiter.
 For production, prefer a shared limiter implementation across instances.
 
 ```ts
-import { createAuth, createMemoryRateLimiter } from 'passkey-magic/server'
+import { createAuth, createMemoryRateLimiter, createUnstorageRateLimiter } from 'passkey-magic/server'
+import { createStorage } from 'unstorage'
 
 const auth = createAuth({
   // ...auth config
@@ -295,7 +296,18 @@ const auth = createAuth({
     },
   },
 })
+
+const sharedLimiter = createUnstorageRateLimiter(createStorage())
+
+const prodAuth = createAuth({
+  // ...auth config
+  rateLimit: {
+    limiter: sharedLimiter,
+  },
+})
 ```
+
+If you use the better-auth plugin, you can pass the same `rateLimit` config there too.
 
 ### Lifecycle Hooks
 
