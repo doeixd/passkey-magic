@@ -556,6 +556,56 @@ describe('createAuth', () => {
       expect(body.error).toContain('Invalid JSON')
     })
 
+    it('rejects oversized token-like inputs', async () => {
+      const auth = makeAuth({
+        email: { sendMagicLink: vi.fn(async () => {}) } as EmailAdapter,
+        magicLinkURL: 'http://localhost:3000/auth/verify',
+      }) as any
+      const handler = auth.createHandler()
+      const oversized = 'x'.repeat(2048)
+
+      const magicLinkRes = await handler(new Request('http://localhost/auth/magic-link/verify', {
+        method: 'POST',
+        body: JSON.stringify({ token: oversized }),
+        headers: { 'Content-Type': 'application/json' },
+      }))
+      expect(magicLinkRes.status).toBe(400)
+
+      const sessionRes = await handler(new Request('http://localhost/auth/session', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${oversized}` },
+      }))
+      expect(sessionRes.status).toBe(401)
+    })
+
+    it('rejects oversized labels and emails', async () => {
+      const auth = makeAuth()
+      const handler = auth.createHandler()
+      await storage.createUser({ id: 'u1', createdAt: new Date() })
+      await storage.createCredential({
+        id: 'c1', userId: 'u1', publicKey: new Uint8Array([1]), counter: 0,
+        deviceType: 'singleDevice', backedUp: false, createdAt: new Date(),
+      })
+      await storage.createSession({
+        id: 's1', token: 'valid-token', userId: 'u1', authMethod: 'passkey',
+        expiresAt: new Date(Date.now() + 10000), createdAt: new Date(),
+      })
+
+      const labelRes = await handler(new Request('http://localhost/auth/account/credentials/c1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer valid-token' },
+        body: JSON.stringify({ label: 'a'.repeat(201) }),
+      }))
+      expect(labelRes.status).toBe(400)
+
+      const emailRes = await handler(new Request('http://localhost/auth/account/link-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer valid-token' },
+        body: JSON.stringify({ email: `${'a'.repeat(255)}@example.com` }),
+      }))
+      expect(emailRes.status).toBe(400)
+    })
+
     it('handles QR session lifecycle', async () => {
       const auth = makeAuth()
       const handler = auth.createHandler()

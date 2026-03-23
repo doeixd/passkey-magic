@@ -50,7 +50,14 @@ export interface PasskeyNamespace {
 }
 
 export interface QRNamespace {
+  /**
+   * Create a desktop QR session.
+   *
+   * Keep `statusToken` private to the initiating device and use it for
+   * polling or cancellation. The QR code itself should only contain `sessionId`.
+   */
   create(): Promise<{ sessionId: string; statusToken: string }>
+  /** Poll a QR session using the secret desktop `statusToken`. */
   getStatus(params: { sessionId: string; statusToken: string }): Promise<QRSessionStatus>
   markScanned(sessionId: string): Promise<void>
   complete(params: {
@@ -68,6 +75,12 @@ export interface MagicLinkNamespace {
 export interface AccountNamespace {
   get(userId: string): Promise<User | null>
   getByEmail(email: string): Promise<User | null>
+  /**
+   * Returns whether an email is currently unused.
+   *
+   * Note: this can reveal whether an email exists in the system, so many
+   * apps should avoid exposing it publicly.
+   */
   isEmailAvailable(email: string): Promise<boolean>
   canLinkEmail(params: { userId: string; email: string }): Promise<EmailLinkability>
   updateMetadata(params: { userId: string; metadata?: User['metadata'] }): Promise<{ user: User }>
@@ -160,10 +173,15 @@ export interface BaseAuthMethods {
 
   // ── QR Cross-Device ──
 
-  /** Create a new QR login session. Returns a `sessionId` to encode in a QR code. */
+  /**
+   * Create a new QR login session.
+   *
+   * Encode only `sessionId` into the QR code. Keep `statusToken` on the desktop
+   * side and require it for polling/cancellation.
+   */
   createQRSession(): Promise<{ sessionId: string; statusToken: string }>
 
-  /** Poll the status of a QR session. */
+  /** Poll the status of a QR session using its desktop-bound status token. */
   getQRSessionStatus(params: { sessionId: string; statusToken: string }): Promise<QRSessionStatus>
 
   /** Mark a QR session as scanned (called from the phone after scanning). */
@@ -206,6 +224,8 @@ export interface BaseAuthMethods {
   /**
    * Check if an email is available (not already linked to a user).
    * Useful before showing a registration form.
+   *
+   * Warning: exposing this publicly can enable account enumeration.
    */
   isEmailAvailable(email: string): Promise<boolean>
 

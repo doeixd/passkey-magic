@@ -27,9 +27,11 @@ export interface PasskeyMagicClient {
   }
 
   qr: {
+    /** Create a desktop QR session and keep `statusToken` private for polling/cancellation. */
     create(): Promise<{ sessionId: string; statusToken: string }>
     render(url: string, opts?: { border?: number }): string
     renderText(url: string, opts?: { border?: number }): string
+    /** Poll QR status with the desktop-only `statusToken`. */
     poll(sessionId: string, statusToken: string, opts?: { interval?: number; signal?: AbortSignal }): AsyncIterable<QRSessionStatus>
     complete(params: { sessionId: string }): Promise<void>
     cancel(params: { sessionId: string; statusToken: string }): Promise<void>
@@ -98,7 +100,7 @@ export interface PasskeyMagicClient {
 
   // ── QR Cross-Device ──
 
-  /** Create a new QR login session on the server. */
+  /** Create a new QR login session on the server. Keep `statusToken` private on the desktop. */
   createQRSession(): Promise<{ sessionId: string; statusToken: string }>
   /** Render a URL as an SVG QR code using uqr. */
   renderQR(url: string, opts?: { border?: number }): string
@@ -106,7 +108,8 @@ export interface PasskeyMagicClient {
   renderQRText(url: string, opts?: { border?: number }): string
   /**
    * Poll a QR session for status changes.
-   * Yields status updates until `authenticated` or `expired`.
+   * Yields status updates until `authenticated`, `expired`, or `cancelled`.
+   * Requires the desktop-only `statusToken` returned from `createQRSession()`.
    */
   pollQRSession(
     sessionId: string,

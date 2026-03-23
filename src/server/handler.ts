@@ -13,6 +13,11 @@ interface HandlerOptions {
   pathPrefix?: string
 }
 
+const MAX_TOKEN_LENGTH = 1024
+const MAX_ID_LENGTH = 256
+const MAX_LABEL_LENGTH = 200
+const MAX_EMAIL_LENGTH = 254
+
 /**
  * Create a Web Standard `Request → Response` handler for all auth routes.
  *
@@ -49,7 +54,7 @@ interface HandlerOptions {
  * POST /account/link-email           — Link email to account (authed)
  * POST /account/unlink-email         — Unlink email from account (authed)
  * POST /account/can-link-email       — Check if current user can link email (authed)
- * POST /account/email-available      — Check email availability
+ * POST /account/email-available      — Check email availability (enumeration-sensitive)
  * DELETE /account                    — Delete account (authed)
  * POST /account/delete               — Delete account (client compatibility)
  * ```
@@ -98,7 +103,7 @@ export function createHandler(
       if (path === '/passkey/register/verify' && request.method === 'POST') {
         const body = await readJSON(request)
         const result = await auth.verifyRegistration({
-          userId: expectString(body, 'userId'),
+          userId: expectIdString(body, 'userId'),
           response: expectObject<RegistrationResponseJSON>(body, 'response'),
         })
         return json(result)
@@ -152,7 +157,7 @@ export function createHandler(
         }
         const body = await readJSON(request)
         const result = await (auth as AuthInstance<EmailAdapter>).sendMagicLink({
-          email: expectString(body, 'email'),
+          email: expectEmailString(body, 'email'),
         })
         return json(result)
       }
@@ -163,7 +168,7 @@ export function createHandler(
         }
         const body = await readJSON(request)
         const result = await (auth as AuthInstance<EmailAdapter>).verifyMagicLink({
-          token: expectString(body, 'token'),
+          token: expectTokenString(body, 'token'),
         })
         return json(result)
       }
@@ -192,7 +197,7 @@ export function createHandler(
         const body = await readJSON(request)
         await auth.cancelQRSession({
           sessionId: qrCancelMatch[1],
-          statusToken: expectString(body, 'statusToken'),
+          statusToken: expectTokenString(body, 'statusToken'),
         })
         return json({ ok: true })
       }
@@ -326,7 +331,7 @@ export function createHandler(
         }
         await auth.updateCredential({
           credentialId: credPatchMatch[1],
-          label: expectOptionalString(body, 'label'),
+          label: expectOptionalLabel(body, 'label'),
           metadata: expectOptionalMetadata(body, 'metadata'),
         })
         return json({ ok: true })
@@ -359,7 +364,7 @@ export function createHandler(
         const body = await readJSON(request)
         const result = await auth.linkEmail({
           userId: user.id,
-          email: expectString(body, 'email'),
+          email: expectEmailString(body, 'email'),
         })
         return json(result)
       }
@@ -375,14 +380,14 @@ export function createHandler(
         const body = await readJSON(request)
         const result = await auth.accounts.canLinkEmail({
           userId: user.id,
-          email: expectString(body, 'email'),
+          email: expectEmailString(body, 'email'),
         })
         return json(result)
       }
 
       if (path === '/account/email-available' && request.method === 'POST') {
         const body = await readJSON(request)
-        const available = await auth.isEmailAvailable(expectString(body, 'email'))
+        const available = await auth.isEmailAvailable(expectEmailString(body, 'email'))
         return json({ available })
       }
 
@@ -415,7 +420,11 @@ function json(data: unknown, status = 200): Response {
 
 function extractBearerToken(request: Request): string | null {
   const header = request.headers.get('Authorization')
-  if (header?.startsWith('Bearer ')) return header.slice(7)
+  if (header?.startsWith('Bearer ')) {
+    const token = header.slice(7)
+    if (token.length === 0 || token.length > MAX_TOKEN_LENGTH) return null
+    return token
+  }
   return null
 }
 
@@ -464,6 +473,38 @@ function expectOptionalMetadata(body: Record<string, unknown>, key: string): Met
     throw new HttpError(400, `Invalid field: ${key} (expected object)`)
   }
   return value as MetadataObject
+}
+
+function expectTokenString(body: Record<string, unknown>, key: string): string {
+  const value = expectString(body, key)
+  if (value.length > MAX_TOKEN_LENGTH) {
+    throw new HttpError(400, `Invalid field: ${key}`)
+  }
+  return value
+}
+
+function expectIdString(body: Record<string, unknown>, key: string): string {
+  const value = expectString(body, key)
+  if (value.length > MAX_ID_LENGTH) {
+    throw new HttpError(400, `Invalid field: ${key}`)
+  }
+  return value
+}
+
+function expectOptionalLabel(body: Record<string, unknown>, key: string): string | undefined {
+  const value = expectOptionalString(body, key)
+  if (value !== undefined && value.length > MAX_LABEL_LENGTH) {
+    throw new HttpError(400, `Invalid field: ${key}`)
+  }
+  return value
+}
+
+function expectEmailString(body: Record<string, unknown>, key: string): string {
+  const value = expectString(body, key)
+  if (value.length > MAX_EMAIL_LENGTH) {
+    throw new HttpError(400, `Invalid field: ${key}`)
+  }
+  return value
 }
 
 /** Known client-side errors that should return 400 instead of 500. */

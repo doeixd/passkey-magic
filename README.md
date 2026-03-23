@@ -114,11 +114,11 @@ Polling stops automatically once the session reaches `authenticated`, `expired`,
 
 ```ts
 // Desktop: create session and display QR code
-const { sessionId } = await auth.qr.create()
+const { sessionId, statusToken } = await auth.qr.create()
 const qrSvg = auth.qr.render(`https://example.com/auth/qr/${sessionId}`)
 
 // Desktop: poll for completion
-for await (const status of auth.qr.poll(sessionId)) {
+for await (const status of auth.qr.poll(sessionId, statusToken)) {
   if (status.state === 'authenticated') {
     // User logged in from their phone
   }
@@ -128,7 +128,7 @@ for await (const status of auth.qr.poll(sessionId)) {
 await auth.qr.complete({ sessionId })
 
 // Optional: cancel an in-flight QR login
-await auth.qr.cancel(sessionId)
+await auth.qr.cancel({ sessionId, statusToken })
 ```
 
 ### Magic Links
