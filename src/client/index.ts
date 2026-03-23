@@ -15,7 +15,7 @@ export interface QRClientFlow {
   renderText(opts?: { border?: number }): string
   poll(opts?: { interval?: number; signal?: AbortSignal; backoffRate?: number; maxInterval?: number; jitter?: number }): AsyncIterable<QRSessionStatus>
   waitForAuthentication(opts?: { interval?: number; signal?: AbortSignal; timeoutMs?: number }): Promise<{ token: string; expiresAt: string }>
-  cancel(): Promise<void>
+  cancel(opts?: { signal?: AbortSignal }): Promise<void>
 }
 
 export type PasskeySignInMethod = 'passkey-autofill' | 'passkey' | 'magic-link'
@@ -59,21 +59,21 @@ export interface PasskeyMagicClient<
   TCredentialMetadata extends MetadataObject = MetadataObject,
 > {
   passkeys: {
-    register: (params?: { userId?: string; email?: string; userName?: string }) => Promise<{
+    register: (params?: { userId?: string; email?: string; userName?: string }, opts?: { signal?: AbortSignal }) => Promise<{
       method: 'passkey'
       user: ClientUser<TUserMetadata>
       session: { token: string; expiresAt: string; authMethod: 'passkey'; authContext?: { qrSessionId?: string } }
       credential: { id: string }
     }>
-    signIn: (params?: { userId?: string }) => Promise<{
+    signIn: (params?: { userId?: string }, opts?: { signal?: AbortSignal }) => Promise<{
       method: 'passkey'
       user: ClientUser<TUserMetadata>
       session: { token: string; expiresAt: string; authMethod: 'passkey'; authContext?: { qrSessionId?: string } }
     }>
-    add: (params?: { userName?: string }) => Promise<{ credential: { id: string } }>
-    list(userId?: string): Promise<{ credentials: Credential<TCredentialMetadata>[] }>
-    update(params: { credentialId: string; label?: string; metadata?: Credential<TCredentialMetadata>['metadata'] }): Promise<void>
-    remove(credentialId: string): Promise<void>
+    add: (params?: { userName?: string }, opts?: { signal?: AbortSignal }) => Promise<{ credential: { id: string } }>
+    list(userId?: string, opts?: { signal?: AbortSignal }): Promise<{ credentials: Credential<TCredentialMetadata>[] }>
+    update(params: { credentialId: string; label?: string; metadata?: Credential<TCredentialMetadata>['metadata'] }, opts?: { signal?: AbortSignal }): Promise<void>
+    remove(credentialId: string, opts?: { signal?: AbortSignal }): Promise<void>
   }
 
   qr: {
@@ -97,15 +97,15 @@ export interface PasskeyMagicClient<
   }
 
   magicLinks: {
-    request(params: { email: string }): Promise<{ sent: true }>
-    verify(params: { token: string }): Promise<{
+    request(params: { email: string }, opts?: { signal?: AbortSignal }): Promise<{ sent: true }>
+    verify(params: { token: string }, opts?: { signal?: AbortSignal }): Promise<{
       method: 'magic-link'
       user: ClientUser<TUserMetadata>
       session: { token: string; expiresAt: string; authMethod: 'magic-link'; authContext?: { qrSessionId?: string } }
       isNewUser: boolean
     }>
     extractToken(input: string | URL): string
-    verifyURL(params: { url: string | URL }): Promise<{
+    verifyURL(params: { url: string | URL }, opts?: { signal?: AbortSignal }): Promise<{
       method: 'magic-link'
       user: ClientUser<TUserMetadata>
       session: { token: string; expiresAt: string; authMethod: 'magic-link'; authContext?: { qrSessionId?: string } }
@@ -114,13 +114,13 @@ export interface PasskeyMagicClient<
   }
 
   accounts: {
-    get(): Promise<{ user: User<TUserMetadata> }>
-    isEmailAvailable(email: string): Promise<boolean>
-    canLinkEmail(email: string): Promise<EmailLinkability>
-    updateMetadata(metadata?: User<TUserMetadata>['metadata']): Promise<{ user: User<TUserMetadata> }>
-    linkEmail(email: string): Promise<{ user: User<TUserMetadata> }>
-    unlinkEmail(): Promise<{ user: User<TUserMetadata> }>
-    delete(): Promise<void>
+    get(opts?: { signal?: AbortSignal }): Promise<{ user: User<TUserMetadata> }>
+    isEmailAvailable(email: string, opts?: { signal?: AbortSignal }): Promise<boolean>
+    canLinkEmail(email: string, opts?: { signal?: AbortSignal }): Promise<EmailLinkability>
+    updateMetadata(metadata?: User<TUserMetadata>['metadata'], opts?: { signal?: AbortSignal }): Promise<{ user: User<TUserMetadata> }>
+    linkEmail(email: string, opts?: { signal?: AbortSignal }): Promise<{ user: User<TUserMetadata> }>
+    unlinkEmail(opts?: { signal?: AbortSignal }): Promise<{ user: User<TUserMetadata> }>
+    delete(opts?: { signal?: AbortSignal }): Promise<void>
   }
 
   // ── Passkey ──
@@ -139,7 +139,7 @@ export interface PasskeyMagicClient<
     userId?: string
     email?: string
     userName?: string
-  }): Promise<{
+  }, opts?: { signal?: AbortSignal }): Promise<{
     method: 'passkey'
     user: ClientUser<TUserMetadata>
     session: { token: string; expiresAt: string; authMethod: 'passkey'; authContext?: { qrSessionId?: string } }
@@ -149,7 +149,7 @@ export interface PasskeyMagicClient<
   /** Sign in with an existing passkey. */
   signInWithPasskey(params?: {
     userId?: string
-  }): Promise<{
+  }, opts?: { signal?: AbortSignal }): Promise<{
     method: 'passkey'
     user: ClientUser<TUserMetadata>
     session: { token: string; expiresAt: string; authMethod: 'passkey'; authContext?: { qrSessionId?: string } }
@@ -158,18 +158,18 @@ export interface PasskeyMagicClient<
   // ── Passkey Management ──
 
   /** Add a passkey to the current account (requires auth). */
-  addPasskey(params?: { userName?: string }): Promise<{ credential: { id: string } }>
+  addPasskey(params?: { userName?: string }, opts?: { signal?: AbortSignal }): Promise<{ credential: { id: string } }>
   /** Update a passkey label. */
-  updateCredential(params: { credentialId: string; label?: string; metadata?: Credential<TCredentialMetadata>['metadata'] }): Promise<void>
+  updateCredential(params: { credentialId: string; label?: string; metadata?: Credential<TCredentialMetadata>['metadata'] }, opts?: { signal?: AbortSignal }): Promise<void>
   /** Remove a passkey. */
-  removeCredential(credentialId: string): Promise<void>
+  removeCredential(credentialId: string, opts?: { signal?: AbortSignal }): Promise<void>
   /** List all passkeys for the current user. */
-  listCredentials(): Promise<{ credentials: Credential<TCredentialMetadata>[] }>
+  listCredentials(opts?: { signal?: AbortSignal }): Promise<{ credentials: Credential<TCredentialMetadata>[] }>
 
   // ── QR Cross-Device ──
 
   /** Create a new QR login session on the server. Keep `statusToken` private on the desktop. */
-  createQRSession(): Promise<{ sessionId: string; statusToken: string; confirmationCode?: string }>
+  createQRSession(opts?: { signal?: AbortSignal }): Promise<{ sessionId: string; statusToken: string; confirmationCode?: string }>
   /** Render a URL as an SVG QR code using uqr. */
   renderQR(url: string, opts?: { border?: number }): string
   /** Render a URL as a text QR code using uqr. */
@@ -191,17 +191,17 @@ export interface PasskeyMagicClient<
     opts?: { interval?: number; signal?: AbortSignal; timeoutMs?: number },
   ): Promise<{ token: string; expiresAt: string }>
   /** Complete a QR session from the scanning device (authenticates with passkey). */
-  confirmQRSession(params: { sessionId: string; confirmationCode: string }): Promise<void>
-  completeQRSession(params: { sessionId: string; confirmationCode?: string }): Promise<void>
+  confirmQRSession(params: { sessionId: string; confirmationCode: string }, opts?: { signal?: AbortSignal }): Promise<void>
+  completeQRSession(params: { sessionId: string; confirmationCode?: string }, opts?: { signal?: AbortSignal }): Promise<void>
   /** Cancel a QR session before it completes. */
-  cancelQRSession(params: { sessionId: string; statusToken: string }): Promise<void>
+  cancelQRSession(params: { sessionId: string; statusToken: string }, opts?: { signal?: AbortSignal }): Promise<void>
 
   // ── Magic Link ──
 
   /** Request a magic link email. */
-  requestMagicLink(params: { email: string }): Promise<{ sent: true }>
+  requestMagicLink(params: { email: string }, opts?: { signal?: AbortSignal }): Promise<{ sent: true }>
   /** Verify a magic link token and create a session. */
-  verifyMagicLink(params: { token: string }): Promise<{
+  verifyMagicLink(params: { token: string }, opts?: { signal?: AbortSignal }): Promise<{
     method: 'magic-link'
     user: ClientUser<TUserMetadata>
     session: { token: string; expiresAt: string; authMethod: 'magic-link'; authContext?: { qrSessionId?: string } }
@@ -210,7 +210,7 @@ export interface PasskeyMagicClient<
   /** Extract a magic-link token from a callback URL. */
   extractMagicLinkToken(input: string | URL): string
   /** Verify a magic-link token directly from a callback URL. */
-  verifyMagicLinkURL(params: { url: string | URL }): Promise<{
+  verifyMagicLinkURL(params: { url: string | URL }, opts?: { signal?: AbortSignal }): Promise<{
     method: 'magic-link'
     user: ClientUser<TUserMetadata>
     session: { token: string; expiresAt: string; authMethod: 'magic-link'; authContext?: { qrSessionId?: string } }
@@ -220,32 +220,32 @@ export interface PasskeyMagicClient<
   // ── Session Management ──
 
   /** Validate the current session. Returns null if invalid/expired. */
-  getSession(): Promise<{ user: User<TUserMetadata>; session: Session } | null>
+  getSession(opts?: { signal?: AbortSignal }): Promise<{ user: User<TUserMetadata>; session: Session } | null>
   /** Observe session changes by polling `getSession()`. Returns an unsubscribe function. */
   observeSession(listener: SessionListener<TUserMetadata>, opts?: SessionObserverOptions): () => void
   /** List all active sessions. */
-  listSessions(): Promise<{ sessions: Session[] }>
+  listSessions(opts?: { signal?: AbortSignal }): Promise<{ sessions: Session[] }>
   /** Revoke the current session (logout). */
-  revokeSession(): Promise<void>
+  revokeSession(opts?: { signal?: AbortSignal }): Promise<void>
   /** Revoke a specific session by ID. */
-  revokeSessionById(sessionId: string): Promise<void>
+  revokeSessionById(sessionId: string, opts?: { signal?: AbortSignal }): Promise<void>
   /** Revoke all sessions (logout everywhere). */
-  revokeAllSessions(): Promise<void>
+  revokeAllSessions(opts?: { signal?: AbortSignal }): Promise<void>
 
   // ── Account Management ──
 
   /** Get the current user profile. */
-  getAccount(): Promise<{ user: User<TUserMetadata> }>
+  getAccount(opts?: { signal?: AbortSignal }): Promise<{ user: User<TUserMetadata> }>
   /** Check if an email is available. */
-  isEmailAvailable(email: string): Promise<boolean>
+  isEmailAvailable(email: string, opts?: { signal?: AbortSignal }): Promise<boolean>
   /** Update metadata on the current account. */
-  updateAccountMetadata(metadata?: User<TUserMetadata>['metadata']): Promise<{ user: User<TUserMetadata> }>
+  updateAccountMetadata(metadata?: User<TUserMetadata>['metadata'], opts?: { signal?: AbortSignal }): Promise<{ user: User<TUserMetadata> }>
   /** Link an email to the current account. */
-  linkEmail(email: string): Promise<{ user: User<TUserMetadata> }>
+  linkEmail(email: string, opts?: { signal?: AbortSignal }): Promise<{ user: User<TUserMetadata> }>
   /** Unlink the email from the current account. */
-  unlinkEmail(): Promise<{ user: User<TUserMetadata> }>
+  unlinkEmail(opts?: { signal?: AbortSignal }): Promise<{ user: User<TUserMetadata> }>
   /** Delete the current account and all data. */
-  deleteAccount(): Promise<void>
+  deleteAccount(opts?: { signal?: AbortSignal }): Promise<void>
 }
 
 /**
@@ -273,9 +273,9 @@ export function createClient<
   TUserMetadata extends MetadataObject = MetadataObject,
   TCredentialMetadata extends MetadataObject = MetadataObject,
 >(config: ClientConfig): PasskeyMagicClient<TUserMetadata, TCredentialMetadata> {
-  const request: ClientConfig['request'] = async <T = unknown>(endpoint: string, body?: unknown): Promise<T> => {
+  const request: ClientConfig['request'] = async <T = unknown>(endpoint: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T> => {
     try {
-      return await config.request<T>(endpoint, body)
+      return await config.request<T>(endpoint, body, options)
     } catch (error) {
       throw normalizeAuthClientError(error)
     }
@@ -295,28 +295,28 @@ export function createClient<
       renderText: (opts) => qr.renderText(builder(sessionId), opts),
       poll: (opts) => qr.pollSession(sessionId, statusToken, opts),
       waitForAuthentication: (opts) => qr.waitForAuthentication(sessionId, statusToken, opts),
-      cancel: () => qr.cancelSession({ sessionId, statusToken }),
+      cancel: (opts) => qr.cancelSession({ sessionId, statusToken }, opts),
     }
   }
 
   const client: PasskeyMagicClient<TUserMetadata, TCredentialMetadata> = {
     passkeys: {
-      register: (params) => passkey.register(params),
-      signIn: (params) => passkey.authenticate(params),
-      async add(params) {
+      register: (params, opts) => passkey.register(params, opts),
+      signIn: (params, opts) => passkey.authenticate(params, opts),
+      async add(params, opts) {
         const { options } = await request<{
           options: Parameters<typeof import('@simplewebauthn/browser').startRegistration>[0]['optionsJSON']
-        }>('/passkey/add/options', params ?? {})
+        }>('/passkey/add/options', params ?? {}, opts)
         const { startRegistration } = await import('@simplewebauthn/browser')
         const response = await startRegistration({ optionsJSON: options })
-        return request('/passkey/add/verify', { response })
+        return request('/passkey/add/verify', { response }, opts)
       },
-      list: () => request('/account/credentials'),
-      async update({ credentialId, label, metadata }) {
-        await request(`/account/credentials/${credentialId}`, { label, metadata })
+      list: (_userId, opts) => request('/account/credentials', undefined, opts),
+      async update({ credentialId, label, metadata }, opts) {
+        await request(`/account/credentials/${credentialId}`, { label, metadata }, opts)
       },
-      async remove(credentialId) {
-        await request(`/account/credentials/${credentialId}/delete`, {})
+      async remove(credentialId, opts) {
+        await request(`/account/credentials/${credentialId}/delete`, {}, opts)
       },
     },
     qr: {
@@ -334,23 +334,23 @@ export function createClient<
       },
     },
     magicLinks: {
-      request: (params) => magicLink.send(params),
-      verify: (params) => magicLink.verify(params),
+      request: (params, opts) => magicLink.send(params, opts),
+      verify: (params, opts) => magicLink.verify(params, opts),
       extractToken: (input) => magicLink.extractToken(input),
-      verifyURL: ({ url }) => magicLink.verifyURL(url),
+      verifyURL: ({ url }, opts) => magicLink.verifyURL(url, opts),
     },
     accounts: {
-      get: () => request('/account'),
-      async isEmailAvailable(email) {
-        const result = await request<{ available: boolean }>('/account/email-available', { email })
+      get: (opts) => request('/account', undefined, opts),
+      async isEmailAvailable(email, opts) {
+        const result = await request<{ available: boolean }>('/account/email-available', { email }, opts)
         return result.available
       },
-      canLinkEmail: (email) => request('/account/can-link-email', { email }),
-      updateMetadata: (metadata: User<TUserMetadata>['metadata']) => request('/account/update', { metadata }),
-      linkEmail: (email) => request('/account/link-email', { email }),
-      unlinkEmail: () => request('/account/unlink-email', {}),
-      async delete() {
-        await request('/account/delete', {})
+      canLinkEmail: (email, opts) => request('/account/can-link-email', { email }, opts),
+      updateMetadata: (metadata: User<TUserMetadata>['metadata'], opts) => request('/account/update', { metadata }, opts),
+      linkEmail: (email, opts) => request('/account/link-email', { email }, opts),
+      unlinkEmail: (opts) => request('/account/unlink-email', {}, opts),
+      async delete(opts) {
+        await request('/account/delete', {}, opts)
       },
     },
 
@@ -365,25 +365,25 @@ export function createClient<
       if (await passkey.supportsAutofill()) return 'passkey-autofill'
       return 'passkey'
     },
-    registerPasskey: (params) => passkey.register(params),
-    signInWithPasskey: (params) => passkey.authenticate(params),
+    registerPasskey: (params, opts) => passkey.register(params, opts),
+    signInWithPasskey: (params, opts) => passkey.authenticate(params, opts),
 
     // Passkey management
-    async addPasskey(params) {
+    async addPasskey(params, opts) {
       const { options } = await request<{
-        options: Parameters<typeof import('@simplewebauthn/browser').startRegistration>[0]['optionsJSON']
-      }>('/passkey/add/options', params ?? {})
+          options: Parameters<typeof import('@simplewebauthn/browser').startRegistration>[0]['optionsJSON']
+      }>('/passkey/add/options', params ?? {}, opts)
       const { startRegistration } = await import('@simplewebauthn/browser')
       const response = await startRegistration({ optionsJSON: options })
-      return request('/passkey/add/verify', { response })
+      return request('/passkey/add/verify', { response }, opts)
     },
-    async updateCredential({ credentialId, label, metadata }) {
-      await request(`/account/credentials/${credentialId}`, { label, metadata })
+    async updateCredential({ credentialId, label, metadata }, opts) {
+      await request(`/account/credentials/${credentialId}`, { label, metadata }, opts)
     },
-    async removeCredential(credentialId) {
-      await request(`/account/credentials/${credentialId}/delete`, {})
+    async removeCredential(credentialId, opts) {
+      await request(`/account/credentials/${credentialId}/delete`, {}, opts)
     },
-    listCredentials: () => request('/account/credentials'),
+    listCredentials: (opts) => request('/account/credentials', undefined, opts),
 
     // QR
     createQRSession: () => qr.createSession(),
@@ -391,20 +391,20 @@ export function createClient<
     renderQRText: (url, opts) => qr.renderText(url, opts),
     pollQRSession: (id, statusToken, opts) => qr.pollSession(id, statusToken, opts),
     waitForQRSession: (id, statusToken, opts) => qr.waitForAuthentication(id, statusToken, opts),
-    confirmQRSession: (params) => qr.confirmSession(params),
-    completeQRSession: (params) => qr.completeSession(params),
-    cancelQRSession: (params) => qr.cancelSession(params),
+    confirmQRSession: (params, opts) => qr.confirmSession(params, opts),
+    completeQRSession: (params, opts) => qr.completeSession(params, opts),
+    cancelQRSession: (params, opts) => qr.cancelSession(params, opts),
 
     // Magic link
-    requestMagicLink: (params) => magicLink.send(params),
-    verifyMagicLink: (params) => magicLink.verify(params),
+    requestMagicLink: (params, opts) => magicLink.send(params, opts),
+    verifyMagicLink: (params, opts) => magicLink.verify(params, opts),
     extractMagicLinkToken: (input) => magicLink.extractToken(input),
-    verifyMagicLinkURL: ({ url }) => magicLink.verifyURL(url),
+    verifyMagicLinkURL: ({ url }, opts) => magicLink.verifyURL(url, opts),
 
     // Session
-    async getSession() {
+    async getSession(opts) {
       try {
-        return await request('/session')
+        return await request('/session', undefined, opts)
       } catch {
         return null
       }
@@ -432,32 +432,32 @@ export function createClient<
         if (timer) clearTimeout(timer)
       }
     },
-    listSessions: () => request('/account/sessions'),
-    async revokeSession() {
-      await request('/session/revoke', {})
+    listSessions: (opts) => request('/account/sessions', undefined, opts),
+    async revokeSession(opts) {
+      await request('/session/revoke', {}, opts)
     },
-    async revokeSessionById(sessionId) {
-      await request(`/account/sessions/${sessionId}/delete`, {})
+    async revokeSessionById(sessionId, opts) {
+      await request(`/account/sessions/${sessionId}/delete`, {}, opts)
     },
-    async revokeAllSessions() {
-      await request('/account/sessions/delete-all', {})
+    async revokeAllSessions(opts) {
+      await request('/account/sessions/delete-all', {}, opts)
     },
 
     // Account
-    getAccount: () => request('/account'),
-    async isEmailAvailable(email) {
-      const result = await request<{ available: boolean }>('/account/email-available', { email })
+    getAccount: (opts) => request('/account', undefined, opts),
+    async isEmailAvailable(email, opts) {
+      const result = await request<{ available: boolean }>('/account/email-available', { email }, opts)
       return result.available
     },
-    updateAccountMetadata: (metadata: User<TUserMetadata>['metadata']) => request('/account/update', { metadata }),
-    async linkEmail(email) {
-      return request('/account/link-email', { email })
+    updateAccountMetadata: (metadata: User<TUserMetadata>['metadata'], opts) => request('/account/update', { metadata }, opts),
+    async linkEmail(email, opts) {
+      return request('/account/link-email', { email }, opts)
     },
-    async unlinkEmail() {
-      return request('/account/unlink-email', {})
+    async unlinkEmail(opts) {
+      return request('/account/unlink-email', {}, opts)
     },
-    async deleteAccount() {
-      await request('/account/delete', {})
+    async deleteAccount(opts) {
+      await request('/account/delete', {}, opts)
     },
   }
 

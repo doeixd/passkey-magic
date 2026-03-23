@@ -19,15 +19,15 @@ export interface ClientQRManager {
     statusToken: string,
     opts?: { interval?: number; signal?: AbortSignal; timeoutMs?: number },
   ): Promise<{ token: string; expiresAt: string }>
-  confirmSession(params: { sessionId: string; confirmationCode: string }): Promise<void>
-  completeSession(params: { sessionId: string; confirmationCode?: string }): Promise<void>
-  cancelSession(params: { sessionId: string; statusToken: string }): Promise<void>
+  confirmSession(params: { sessionId: string; confirmationCode: string }, opts?: { signal?: AbortSignal }): Promise<void>
+  completeSession(params: { sessionId: string; confirmationCode?: string }, opts?: { signal?: AbortSignal }): Promise<void>
+  cancelSession(params: { sessionId: string; statusToken: string }, opts?: { signal?: AbortSignal }): Promise<void>
 }
 
 export function createClientQRManager(config: ClientConfig): ClientQRManager {
   return {
     async createSession() {
-      return config.request<{ sessionId: string; statusToken: string; confirmationCode?: string }>('/qr/create', {})
+      return config.request<{ sessionId: string; statusToken: string; confirmationCode?: string }>('/qr/create', {}, undefined)
     },
 
     renderSVG(url, opts) {
@@ -47,7 +47,7 @@ export function createClientQRManager(config: ClientConfig): ClientQRManager {
       let attempt = 0
 
       while (!signal?.aborted) {
-        const status = await config.request<QRSessionStatus>(`/qr/${sessionId}/status?token=${encodeURIComponent(statusToken)}`)
+        const status = await config.request<QRSessionStatus>(`/qr/${sessionId}/status?token=${encodeURIComponent(statusToken)}`, undefined, { signal })
         yield status
 
         if (
@@ -93,28 +93,28 @@ export function createClientQRManager(config: ClientConfig): ClientQRManager {
       throw new Error('QR session stopped before authentication')
     },
 
-    async confirmSession({ sessionId, confirmationCode }) {
-      await config.request(`/qr/${sessionId}/confirm`, { confirmationCode })
+    async confirmSession({ sessionId, confirmationCode }, opts) {
+      await config.request(`/qr/${sessionId}/confirm`, { confirmationCode }, opts)
     },
 
-    async completeSession({ sessionId, confirmationCode }) {
-      await config.request(`/qr/${sessionId}/scanned`, {})
+    async completeSession({ sessionId, confirmationCode }, opts) {
+      await config.request(`/qr/${sessionId}/scanned`, {}, opts)
 
       if (confirmationCode) {
-        await config.request(`/qr/${sessionId}/confirm`, { confirmationCode })
+        await config.request(`/qr/${sessionId}/confirm`, { confirmationCode }, opts)
       }
 
       const { startAuthentication } = await import('@simplewebauthn/browser')
       const { options } = await config.request<{
         options: PublicKeyCredentialRequestOptionsJSON
-      }>('/passkey/authenticate/options', {})
+      }>('/passkey/authenticate/options', {}, opts)
       const response = await startAuthentication({ optionsJSON: options })
 
-      await config.request(`/qr/${sessionId}/complete`, { response })
+      await config.request(`/qr/${sessionId}/complete`, { response }, opts)
     },
 
-    async cancelSession({ sessionId, statusToken }) {
-      await config.request(`/qr/${sessionId}/cancel`, { statusToken })
+    async cancelSession({ sessionId, statusToken }, opts) {
+      await config.request(`/qr/${sessionId}/cancel`, { statusToken }, opts)
     },
   }
 }

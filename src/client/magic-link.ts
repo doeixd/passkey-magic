@@ -2,15 +2,15 @@ import type { ClientConfig } from '../types.js'
 
 /** Client-side magic link manager. */
 export interface ClientMagicLinkManager {
-  send(params: { email: string }): Promise<{ sent: true }>
-  verify(params: { token: string }): Promise<{
+  send(params: { email: string }, opts?: { signal?: AbortSignal }): Promise<{ sent: true }>
+  verify(params: { token: string }, opts?: { signal?: AbortSignal }): Promise<{
     method: 'magic-link'
     user: { id: string; email?: string }
     session: { token: string; expiresAt: string; authMethod: 'magic-link'; authContext?: { qrSessionId?: string } }
     isNewUser: boolean
   }>
   extractToken(input: string | URL): string
-  verifyURL(input: string | URL): Promise<{
+  verifyURL(input: string | URL, opts?: { signal?: AbortSignal }): Promise<{
     method: 'magic-link'
     user: { id: string; email?: string }
     session: { token: string; expiresAt: string; authMethod: 'magic-link'; authContext?: { qrSessionId?: string } }
@@ -20,12 +20,12 @@ export interface ClientMagicLinkManager {
 
 export function createClientMagicLinkManager(config: ClientConfig): ClientMagicLinkManager {
   return {
-    async send({ email }) {
-      return config.request('/magic-link/send', { email })
+    async send({ email }, opts) {
+      return config.request('/magic-link/send', { email }, opts)
     },
 
-    async verify({ token }) {
-      return config.request('/magic-link/verify', { token })
+    async verify({ token }, opts) {
+      return config.request('/magic-link/verify', { token }, opts)
     },
 
     extractToken(input) {
@@ -37,9 +37,9 @@ export function createClientMagicLinkManager(config: ClientConfig): ClientMagicL
       return token
     },
 
-    async verifyURL(input) {
+    async verifyURL(input, opts) {
       const token = this.extractToken(input)
-      return this.verify({ token })
+      return this.verify({ token }, opts)
     },
   }
 }

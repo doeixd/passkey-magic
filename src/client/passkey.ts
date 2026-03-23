@@ -20,7 +20,7 @@ export interface ClientPasskeyManager {
     userId?: string
     email?: string
     userName?: string
-  }): Promise<{
+  }, opts?: { signal?: AbortSignal }): Promise<{
     method: 'passkey'
     user: { id: string; email?: string }
     session: { token: string; expiresAt: string; authMethod: 'passkey'; authContext?: { qrSessionId?: string } }
@@ -29,7 +29,7 @@ export interface ClientPasskeyManager {
 
   authenticate(params?: {
     userId?: string
-  }): Promise<{
+  }, opts?: { signal?: AbortSignal }): Promise<{
     method: 'passkey'
     user: { id: string; email?: string }
     session: { token: string; expiresAt: string; authMethod: 'passkey'; authContext?: { qrSessionId?: string } }
@@ -50,25 +50,25 @@ export function createClientPasskeyManager(config: ClientConfig): ClientPasskeyM
       return platformAuthenticatorIsAvailable()
     },
 
-    async register(params) {
+    async register(params, opts) {
       const { options, userId } = await config.request<{
         options: PublicKeyCredentialCreationOptionsJSON
         userId: string
-      }>('/passkey/register/options', params ?? {})
+      }>('/passkey/register/options', params ?? {}, opts)
 
       const response = await startRegistration({ optionsJSON: options })
 
-      return config.request('/passkey/register/verify', { userId, response })
+      return config.request('/passkey/register/verify', { userId, response }, opts)
     },
 
-    async authenticate(params) {
+    async authenticate(params, opts) {
       const { options } = await config.request<{
         options: PublicKeyCredentialRequestOptionsJSON
-      }>('/passkey/authenticate/options', params ?? {})
+      }>('/passkey/authenticate/options', params ?? {}, opts)
 
       const response = await startAuthentication({ optionsJSON: options })
 
-      return config.request('/passkey/authenticate/verify', { response })
+      return config.request('/passkey/authenticate/verify', { response }, opts)
     },
   }
 }

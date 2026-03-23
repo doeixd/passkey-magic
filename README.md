@@ -96,6 +96,9 @@ const unsubscribe = auth.observeSession((current) => {
 }, { intervalMs: 30_000 })
 
 const method = await auth.getBestSignInMethod()
+
+const controller = new AbortController()
+await auth.requestMagicLink({ email: 'user@example.com' }, { signal: controller.signal })
 ```
 
 ## Features

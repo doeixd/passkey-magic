@@ -298,7 +298,7 @@ export interface MagicLinkMethods {
  * transport to your server (fetch, tRPC, WebSocket, etc.).
  */
 export interface ClientConfig {
-  request: <T = unknown>(endpoint: string, body?: unknown) => Promise<T>
+  request: <T = unknown>(endpoint: string, body?: unknown, options?: { signal?: AbortSignal }) => Promise<T>
 }
 
 /** Status of a QR cross-device login session. */

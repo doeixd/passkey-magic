@@ -54,10 +54,10 @@ describe('createClient grouped helpers', () => {
     await client.accounts.unlinkEmail()
     await client.accounts.delete()
 
-    expect(request).toHaveBeenCalledWith('/account/link-email', { email: 'next@example.com' })
-    expect(request).toHaveBeenCalledWith('/account/update', { metadata: { theme: 'dark' } })
-    expect(request).toHaveBeenCalledWith('/account/unlink-email', {})
-    expect(request).toHaveBeenCalledWith('/account/delete', {})
+    expect(request).toHaveBeenCalledWith('/account/link-email', { email: 'next@example.com' }, undefined)
+    expect(request).toHaveBeenCalledWith('/account/update', { metadata: { theme: 'dark' } }, undefined)
+    expect(request).toHaveBeenCalledWith('/account/unlink-email', {}, undefined)
+    expect(request).toHaveBeenCalledWith('/account/delete', {}, undefined)
   })
 
   it('validates the current session without requiring a token argument', async () => {
@@ -82,7 +82,7 @@ describe('createClient grouped helpers', () => {
     const result = await client.getSession()
 
     expect(result?.user.id).toBe('u1')
-    expect(request).toHaveBeenCalledWith('/session', undefined)
+    expect(request).toHaveBeenCalledWith('/session', undefined, undefined)
   })
 
   it('carries metadata generics through client and server APIs', () => {
@@ -168,7 +168,7 @@ describe('createClient grouped helpers', () => {
     expect(result.user.id).toBe('u1')
 
     await client.confirmQRSession({ sessionId: 'qr1', confirmationCode: '123456' })
-    expect(request).toHaveBeenCalledWith('/qr/qr1/confirm', { confirmationCode: '123456' })
+    expect(request).toHaveBeenCalledWith('/qr/qr1/confirm', { confirmationCode: '123456' }, undefined)
   })
 
   it('provides QR flow, session observer, and sign-in strategy helpers', async () => {
@@ -196,5 +196,19 @@ describe('createClient grouped helpers', () => {
     await new Promise((resolve) => setTimeout(resolve, 5))
     unsubscribe()
     expect(listener).toHaveBeenCalled()
+  })
+
+  it('passes abort signals through client transport', async () => {
+    const controller = new AbortController()
+    const request = vi.fn(async () => ({ sent: true }))
+    const client = createClient({ request: request as any })
+
+    await client.requestMagicLink({ email: 'user@example.com' }, { signal: controller.signal })
+    await client.getSession({ signal: controller.signal })
+    await client.confirmQRSession({ sessionId: 'qr1', confirmationCode: '123456' }, { signal: controller.signal })
+
+    expect(request).toHaveBeenCalledWith('/magic-link/send', { email: 'user@example.com' }, { signal: controller.signal })
+    expect(request).toHaveBeenCalledWith('/session', undefined, { signal: controller.signal })
+    expect(request).toHaveBeenCalledWith('/qr/qr1/confirm', { confirmationCode: '123456' }, { signal: controller.signal })
   })
 })
