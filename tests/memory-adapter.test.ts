@@ -224,18 +224,18 @@ describe('memoryAdapter', () => {
     it('creates and retrieves QR session', async () => {
       await storage.createQRSession({
         id: 'qr1',
-        state: 'pending',
+        state: 'created',
         expiresAt: new Date(Date.now() + 10000),
         createdAt: new Date(),
       })
       const found = await storage.getQRSession('qr1')
-      expect(found?.state).toBe('pending')
+      expect(found?.state).toBe('created')
     })
 
     it('marks expired QR session', async () => {
       await storage.createQRSession({
         id: 'qr2',
-        state: 'pending',
+        state: 'scanned',
         expiresAt: new Date(Date.now() - 1000),
         createdAt: new Date(),
       })
@@ -246,7 +246,7 @@ describe('memoryAdapter', () => {
     it('updates QR session', async () => {
       await storage.createQRSession({
         id: 'qr3',
-        state: 'pending',
+        state: 'created',
         expiresAt: new Date(Date.now() + 10000),
         createdAt: new Date(),
       })

@@ -49,11 +49,15 @@ export interface Session {
 /** A cross-device login session initiated by QR code scan. */
 export interface QRSession {
   id: string
-  state: 'pending' | 'scanned' | 'authenticated' | 'expired'
+  state: 'created' | 'scanned' | 'challenged' | 'authenticated' | 'expired' | 'cancelled'
   userId?: string
   sessionToken?: string
   expiresAt: Date
   createdAt: Date
+  scannedAt?: Date
+  challengedAt?: Date
+  authenticatedAt?: Date
+  cancelledAt?: Date
 }
 
 // ── Auth Results ──

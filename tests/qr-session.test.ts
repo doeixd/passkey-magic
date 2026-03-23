@@ -16,7 +16,7 @@ describe('QRSessionManager', () => {
     const { sessionId } = await qr.create()
     expect(sessionId).toBeTruthy()
     const status = await qr.getStatus(sessionId)
-    expect(status.state).toBe('pending')
+    expect(status.state).toBe('created')
   })
 
   it('marks session as scanned', async () => {
@@ -28,21 +28,31 @@ describe('QRSessionManager', () => {
 
   it('completes a session', async () => {
     const { sessionId } = await qr.create()
-    await qr.complete(sessionId, 'user-1')
+    await qr.markScanned(sessionId)
+    await qr.beginChallenge(sessionId)
+    await qr.complete(sessionId, 'user-1', 'session-token')
     const status = await qr.getStatus(sessionId)
     expect(status.state).toBe('authenticated')
+    expect(status.session?.token).toBe('session-token')
   })
 
   it('prevents completing an already completed session', async () => {
     const { sessionId } = await qr.create()
-    await qr.complete(sessionId, 'user-1')
-    await expect(qr.complete(sessionId, 'user-2')).rejects.toThrow('cannot complete')
+    await qr.markScanned(sessionId)
+    await qr.beginChallenge(sessionId)
+    await qr.complete(sessionId, 'user-1', 'session-token')
+    await expect(qr.complete(sessionId, 'user-2', 'session-token-2')).rejects.toThrow('cannot complete')
   })
 
-  it('prevents scanning a non-pending session', async () => {
+  it('allows duplicate scan calls while challenge has not completed', async () => {
     const { sessionId } = await qr.create()
     await qr.markScanned(sessionId)
-    await expect(qr.markScanned(sessionId)).rejects.toThrow('expected pending')
+    await expect(qr.markScanned(sessionId)).resolves.toBeUndefined()
+  })
+
+  it('prevents challenge before scan', async () => {
+    const { sessionId } = await qr.create()
+    await expect(qr.beginChallenge(sessionId)).rejects.toThrow('cannot begin challenge')
   })
 
   it('marks expired sessions', async () => {
@@ -52,6 +62,22 @@ describe('QRSessionManager', () => {
     await new Promise((r) => setTimeout(r, 5))
     const status = await expiredQr.getStatus(sessionId)
     expect(status.state).toBe('expired')
+  })
+
+  it('expires scanned sessions too', async () => {
+    const expiredQr = createQRSessionManager(storage, { ttl: 0 })
+    const { sessionId } = await expiredQr.create()
+    await expiredQr.markScanned(sessionId)
+    await new Promise((r) => setTimeout(r, 5))
+    const status = await expiredQr.getStatus(sessionId)
+    expect(status.state).toBe('expired')
+  })
+
+  it('cancels an active session', async () => {
+    const { sessionId } = await qr.create()
+    await qr.cancel(sessionId)
+    const status = await qr.getStatus(sessionId)
+    expect(status.state).toBe('cancelled')
   })
 
   it('throws for unknown session', async () => {

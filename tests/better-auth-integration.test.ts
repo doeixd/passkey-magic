@@ -105,7 +105,7 @@ describe('better-auth integration', () => {
     )
     expect(statusRes.status).toBe(200)
     const status = await statusRes.json()
-    expect(status.state).toBe('pending')
+    expect(status.state).toBe('created')
   })
 
   it('POST /passkey-magic/qr/scanned marks QR session as scanned', async () => {
@@ -199,7 +199,7 @@ describe('better-auth integration', () => {
     expect(db.qrSession).toBeDefined()
     expect(db.qrSession.length).toBe(1)
     expect(db.qrSession[0].id).toBe(sessionId)
-    expect(db.qrSession[0].state).toBe('pending')
+    expect(db.qrSession[0].state).toBe('created')
   })
 
   // ── Multiple operations ──
@@ -215,13 +215,13 @@ describe('better-auth integration', () => {
     )
     const { sessionId } = await createRes.json()
 
-    // Poll: pending
+    // Poll: created
     let statusRes = await auth.handler(
       new Request(`http://localhost:3000/api/auth/passkey-magic/qr/status?sessionId=${sessionId}`, {
         method: 'GET',
       }),
     )
-    expect((await statusRes.json()).state).toBe('pending')
+    expect((await statusRes.json()).state).toBe('created')
 
     // Scan
     await auth.handler(

@@ -175,6 +175,12 @@ export function createHandler(
         return json({ ok: true })
       }
 
+      const qrCancelMatch = path.match(/^\/qr\/([^/]+)\/cancel$/)
+      if (qrCancelMatch && request.method === 'POST') {
+        await auth.cancelQRSession(qrCancelMatch[1])
+        return json({ ok: true })
+      }
+
       const qrCompleteMatch = path.match(/^\/qr\/([^/]+)\/complete$/)
       if (qrCompleteMatch && request.method === 'POST') {
         const body = await readJSON(request)

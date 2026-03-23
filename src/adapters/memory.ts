@@ -22,6 +22,10 @@ export function memoryAdapter(): StorageAdapter {
     return !entry || Date.now() > entry.expiresAt
   }
 
+  function isTerminalQRState(state: QRSession['state']): boolean {
+    return state === 'authenticated' || state === 'expired' || state === 'cancelled'
+  }
+
   return {
     // ── Users ──
     async createUser(user) {
@@ -154,7 +158,7 @@ export function memoryAdapter(): StorageAdapter {
     async getQRSession(id) {
       const session = qrSessions.get(id)
       if (!session) return null
-      if (new Date() > session.expiresAt && session.state === 'pending') {
+      if (new Date() > session.expiresAt && !isTerminalQRState(session.state)) {
         session.state = 'expired'
       }
       return { ...session }

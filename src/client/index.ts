@@ -67,6 +67,8 @@ export interface PasskeyMagicClient {
   ): AsyncIterable<QRSessionStatus>
   /** Complete a QR session from the scanning device (authenticates with passkey). */
   completeQRSession(params: { sessionId: string }): Promise<void>
+  /** Cancel a QR session before it completes. */
+  cancelQRSession(sessionId: string): Promise<void>
 
   // ── Magic Link ──
 
@@ -164,6 +166,7 @@ export function createClient(config: ClientConfig): PasskeyMagicClient {
     renderQRText: (url, opts) => qr.renderText(url, opts),
     pollQRSession: (id, opts) => qr.pollSession(id, opts),
     completeQRSession: (params) => qr.completeSession(params),
+    cancelQRSession: (sessionId) => qr.cancelSession(sessionId),
 
     // Magic link
     requestMagicLink: (params) => magicLink.send(params),

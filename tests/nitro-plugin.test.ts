@@ -132,7 +132,7 @@ describe('Nitro plugin', () => {
     // Verify the data is in unstorage under the correct prefix
     const qrData = await storage.getItem(`myauth:qr:${sessionId}`)
     expect(qrData).toBeDefined()
-    expect((qrData as any).state).toBe('pending')
+    expect((qrData as any).state).toBe('created')
   })
 
   it('supports magic link when email adapter is provided', () => {

@@ -48,6 +48,10 @@ const qrSessionSchema = {
     sessionToken: { type: 'string' as const, required: false },
     expiresAt: { type: 'date' as const, required: true },
     createdAt: { type: 'date' as const, required: true },
+    scannedAt: { type: 'date' as const, required: false },
+    challengedAt: { type: 'date' as const, required: false },
+    authenticatedAt: { type: 'date' as const, required: false },
+    cancelledAt: { type: 'date' as const, required: false },
   },
 }
 
@@ -353,6 +357,10 @@ function createBridgedStorage(adapter: BetterAuthAdapter): StorageAdapter {
           sessionToken: session.sessionToken ?? null,
           expiresAt: session.expiresAt,
           createdAt: session.createdAt,
+          scannedAt: session.scannedAt ?? null,
+          challengedAt: session.challengedAt ?? null,
+          authenticatedAt: session.authenticatedAt ?? null,
+          cancelledAt: session.cancelledAt ?? null,
         },
         forceAllowId: true,
       })
@@ -372,6 +380,10 @@ function createBridgedStorage(adapter: BetterAuthAdapter): StorageAdapter {
           sessionToken: row.sessionToken ?? undefined,
           expiresAt: new Date(row.expiresAt),
           createdAt: new Date(row.createdAt),
+          scannedAt: row.scannedAt ? new Date(row.scannedAt) : undefined,
+          challengedAt: row.challengedAt ? new Date(row.challengedAt) : undefined,
+          authenticatedAt: row.authenticatedAt ? new Date(row.authenticatedAt) : undefined,
+          cancelledAt: row.cancelledAt ? new Date(row.cancelledAt) : undefined,
         }
       } catch {
         return null

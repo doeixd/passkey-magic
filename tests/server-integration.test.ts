@@ -477,11 +477,15 @@ describe('createAuth', () => {
       // Poll
       const statusRes = await handler(new Request(`http://localhost/auth/qr/${sessionId}/status`))
       expect(statusRes.status).toBe(200)
-      expect((await statusRes.json()).state).toBe('pending')
+      expect((await statusRes.json()).state).toBe('created')
 
       // Scan
       const scanRes = await handler(new Request(`http://localhost/auth/qr/${sessionId}/scanned`, { method: 'POST' }))
       expect(scanRes.status).toBe(200)
+
+      // Cancel
+      const cancelRes = await handler(new Request(`http://localhost/auth/qr/${sessionId}/cancel`, { method: 'POST' }))
+      expect(cancelRes.status).toBe(200)
     })
 
     it('returns 400 for magic link when not configured', async () => {

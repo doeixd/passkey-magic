@@ -14,6 +14,7 @@ export interface ClientQRManager {
     opts?: { interval?: number; signal?: AbortSignal },
   ): AsyncIterable<QRSessionStatus>
   completeSession(params: { sessionId: string }): Promise<void>
+  cancelSession(sessionId: string): Promise<void>
 }
 
 export function createClientQRManager(config: ClientConfig): ClientQRManager {
@@ -38,7 +39,11 @@ export function createClientQRManager(config: ClientConfig): ClientQRManager {
         const status = await config.request<QRSessionStatus>(`/qr/${sessionId}/status`)
         yield status
 
-        if (status.state === 'authenticated' || status.state === 'expired') {
+        if (
+          status.state === 'authenticated' ||
+          status.state === 'expired' ||
+          status.state === 'cancelled'
+        ) {
           return
         }
 
@@ -62,6 +67,10 @@ export function createClientQRManager(config: ClientConfig): ClientQRManager {
       const response = await startAuthentication({ optionsJSON: options })
 
       await config.request(`/qr/${sessionId}/complete`, { response })
+    },
+
+    async cancelSession(sessionId) {
+      await config.request(`/qr/${sessionId}/cancel`, {})
     },
   }
 }

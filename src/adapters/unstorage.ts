@@ -66,7 +66,15 @@ export function unstorageAdapter(
       ...raw,
       expiresAt: new Date(raw.expiresAt as string),
       createdAt: new Date(raw.createdAt as string),
+      scannedAt: raw.scannedAt ? new Date(raw.scannedAt as string) : undefined,
+      challengedAt: raw.challengedAt ? new Date(raw.challengedAt as string) : undefined,
+      authenticatedAt: raw.authenticatedAt ? new Date(raw.authenticatedAt as string) : undefined,
+      cancelledAt: raw.cancelledAt ? new Date(raw.cancelledAt as string) : undefined,
     } as QRSession
+  }
+
+  function isTerminalQRState(state: QRSession['state']): boolean {
+    return state === 'authenticated' || state === 'expired' || state === 'cancelled'
   }
 
   const adapter: StorageAdapter = {
@@ -287,7 +295,7 @@ export function unstorageAdapter(
       const session = deserializeQRSession(raw)
       if (!session) return null
 
-      if (new Date() > session.expiresAt && session.state === 'pending') {
+      if (new Date() > session.expiresAt && !isTerminalQRState(session.state)) {
         session.state = 'expired'
       }
 

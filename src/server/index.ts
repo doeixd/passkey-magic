@@ -103,6 +103,9 @@ export interface BaseAuthMethods {
   /** Mark a QR session as scanned (called from the phone after scanning). */
   markQRSessionScanned(sessionId: string): Promise<void>
 
+  /** Cancel a QR session before it completes. */
+  cancelQRSession(sessionId: string): Promise<void>
+
   /**
    * Complete a QR session — authenticates on the phone, creates a session
    * for the desktop. Called from the phone after passkey auth.
@@ -351,7 +354,12 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
       emitter.emit('qr:scanned', { sessionId })
     },
 
+    async cancelQRSession(sessionId) {
+      await qrSessions.cancel(sessionId)
+    },
+
     async completeQRSession({ sessionId, response }) {
+      await qrSessions.beginChallenge(sessionId)
       const { user } = await passkeys.verifyAuthentication({ response })
 
       if (hooks.beforeQRComplete) {
@@ -363,11 +371,7 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
         authContext: { qrSessionId: sessionId },
       })
 
-      await config.storage.updateQRSession(sessionId, {
-        state: 'authenticated',
-        userId: user.id,
-        sessionToken: session.token,
-      })
+      await qrSessions.complete(sessionId, user.id, session.token)
 
       emitter.emit('qr:completed', { sessionId, user })
       emitter.emit('session:created', { session, user, method: 'qr' })
