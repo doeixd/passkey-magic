@@ -1,5 +1,5 @@
 import { timingSafeEqual } from '../crypto.js'
-import type { Credential, QRSession, Session, StorageAdapter, User } from '../types.js'
+import type { Credential, MetadataObject, QRSession, Session, StorageAdapter, User } from '../types.js'
 
 interface TTLEntry<T> {
   value: T
@@ -10,9 +10,12 @@ interface TTLEntry<T> {
  * In-memory storage adapter for development and testing.
  * Data is not persisted across restarts.
  */
-export function memoryAdapter(): StorageAdapter {
-  const users = new Map<string, User>()
-  const credentials = new Map<string, Credential>()
+export function memoryAdapter<
+  TUserMetadata extends MetadataObject = MetadataObject,
+  TCredentialMetadata extends MetadataObject = MetadataObject,
+>(): StorageAdapter<TUserMetadata, TCredentialMetadata> {
+  const users = new Map<string, User<TUserMetadata>>()
+  const credentials = new Map<string, Credential<TCredentialMetadata>>()
   const sessions = new Map<string, Session>()
   const challenges = new Map<string, TTLEntry<string>>()
   const magicLinks = new Map<string, TTLEntry<{ email: string }>>()
@@ -31,11 +34,11 @@ export function memoryAdapter(): StorageAdapter {
     return JSON.parse(JSON.stringify(value)) as T
   }
 
-  function cloneUser(user: User): User {
+  function cloneUser(user: User<TUserMetadata>): User<TUserMetadata> {
     return { ...user, metadata: cloneMetadata(user.metadata) }
   }
 
-  function cloneCredential(cred: Credential): Credential {
+  function cloneCredential(cred: Credential<TCredentialMetadata>): Credential<TCredentialMetadata> {
     return { ...cred, metadata: cloneMetadata(cred.metadata) }
   }
 
@@ -80,7 +83,7 @@ export function memoryAdapter(): StorageAdapter {
       return cred ? cloneCredential(cred) : null
     },
     async getCredentialsByUserId(userId) {
-      const result: Credential[] = []
+      const result: Credential<TCredentialMetadata>[] = []
       for (const cred of credentials.values()) {
         if (cred.userId === userId) result.push(cloneCredential(cred))
       }

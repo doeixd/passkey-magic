@@ -215,6 +215,37 @@ if (canLink.ok) {
 }
 ```
 
+### Typed Metadata
+
+You can thread metadata types through both server and client APIs.
+
+```ts
+type UserMeta = {
+  theme: 'light' | 'dark'
+}
+
+type CredentialMeta = {
+  nickname: string
+}
+
+const auth = createAuth<UserMeta, CredentialMeta>({
+  rpName: 'My App',
+  rpID: 'example.com',
+  origin: 'https://example.com',
+  storage: memoryAdapter<UserMeta, CredentialMeta>(),
+})
+
+await auth.accounts.updateMetadata({
+  userId: 'user_123',
+  metadata: { theme: 'dark' },
+})
+
+await auth.passkeys.update({
+  credentialId: 'cred_123',
+  metadata: { nickname: 'Work MacBook' },
+})
+```
+
 ### Session Management
 
 ```ts

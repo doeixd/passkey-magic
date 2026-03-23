@@ -1,28 +1,33 @@
-import type { ClientConfig, Credential, EmailLinkability, QRSessionStatus, Session, User } from '../types.js'
+import type { ClientConfig, Credential, EmailLinkability, MetadataObject, QRSessionStatus, Session, User } from '../types.js'
 import { createClientPasskeyManager } from './passkey.js'
 import { createClientQRManager } from './qr.js'
 import { createClientMagicLinkManager } from './magic-link.js'
+
+type ClientUser<TUserMetadata extends MetadataObject> = Pick<User<TUserMetadata>, 'id' | 'email' | 'metadata'>
 
 /**
  * Client-side auth interface. All methods delegate to the server
  * via the `request` function you provide in config.
  */
-export interface PasskeyMagicClient {
+export interface PasskeyMagicClient<
+  TUserMetadata extends MetadataObject = MetadataObject,
+  TCredentialMetadata extends MetadataObject = MetadataObject,
+> {
   passkeys: {
     register: (params?: { userId?: string; email?: string; userName?: string }) => Promise<{
       method: 'passkey'
-      user: { id: string; email?: string }
+      user: ClientUser<TUserMetadata>
       session: { token: string; expiresAt: string; authMethod: 'passkey'; authContext?: { qrSessionId?: string } }
       credential: { id: string }
     }>
     signIn: (params?: { userId?: string }) => Promise<{
       method: 'passkey'
-      user: { id: string; email?: string }
+      user: ClientUser<TUserMetadata>
       session: { token: string; expiresAt: string; authMethod: 'passkey'; authContext?: { qrSessionId?: string } }
     }>
     add: (params?: { userName?: string }) => Promise<{ credential: { id: string } }>
-    list(userId?: string): Promise<{ credentials: Credential[] }>
-    update(params: { credentialId: string; label?: string; metadata?: Credential['metadata'] }): Promise<void>
+    list(userId?: string): Promise<{ credentials: Credential<TCredentialMetadata>[] }>
+    update(params: { credentialId: string; label?: string; metadata?: Credential<TCredentialMetadata>['metadata'] }): Promise<void>
     remove(credentialId: string): Promise<void>
   }
 
@@ -41,19 +46,19 @@ export interface PasskeyMagicClient {
     request(params: { email: string }): Promise<{ sent: true }>
     verify(params: { token: string }): Promise<{
       method: 'magic-link'
-      user: { id: string; email?: string }
+      user: ClientUser<TUserMetadata>
       session: { token: string; expiresAt: string; authMethod: 'magic-link'; authContext?: { qrSessionId?: string } }
       isNewUser: boolean
     }>
   }
 
   accounts: {
-    get(): Promise<{ user: User }>
+    get(): Promise<{ user: User<TUserMetadata> }>
     isEmailAvailable(email: string): Promise<boolean>
     canLinkEmail(email: string): Promise<EmailLinkability>
-    updateMetadata(metadata?: User['metadata']): Promise<{ user: User }>
-    linkEmail(email: string): Promise<{ user: User }>
-    unlinkEmail(): Promise<{ user: User }>
+    updateMetadata(metadata?: User<TUserMetadata>['metadata']): Promise<{ user: User<TUserMetadata> }>
+    linkEmail(email: string): Promise<{ user: User<TUserMetadata> }>
+    unlinkEmail(): Promise<{ user: User<TUserMetadata> }>
     delete(): Promise<void>
   }
 
@@ -73,7 +78,7 @@ export interface PasskeyMagicClient {
     userName?: string
   }): Promise<{
     method: 'passkey'
-    user: { id: string; email?: string }
+    user: ClientUser<TUserMetadata>
     session: { token: string; expiresAt: string; authMethod: 'passkey'; authContext?: { qrSessionId?: string } }
     credential: { id: string }
   }>
@@ -83,7 +88,7 @@ export interface PasskeyMagicClient {
     userId?: string
   }): Promise<{
     method: 'passkey'
-    user: { id: string; email?: string }
+    user: ClientUser<TUserMetadata>
     session: { token: string; expiresAt: string; authMethod: 'passkey'; authContext?: { qrSessionId?: string } }
   }>
 
@@ -92,11 +97,11 @@ export interface PasskeyMagicClient {
   /** Add a passkey to the current account (requires auth). */
   addPasskey(params?: { userName?: string }): Promise<{ credential: { id: string } }>
   /** Update a passkey label. */
-  updateCredential(params: { credentialId: string; label?: string; metadata?: Credential['metadata'] }): Promise<void>
+  updateCredential(params: { credentialId: string; label?: string; metadata?: Credential<TCredentialMetadata>['metadata'] }): Promise<void>
   /** Remove a passkey. */
   removeCredential(credentialId: string): Promise<void>
   /** List all passkeys for the current user. */
-  listCredentials(): Promise<{ credentials: Credential[] }>
+  listCredentials(): Promise<{ credentials: Credential<TCredentialMetadata>[] }>
 
   // ── QR Cross-Device ──
 
@@ -128,7 +133,7 @@ export interface PasskeyMagicClient {
   /** Verify a magic link token and create a session. */
   verifyMagicLink(params: { token: string }): Promise<{
     method: 'magic-link'
-    user: { id: string; email?: string }
+    user: ClientUser<TUserMetadata>
     session: { token: string; expiresAt: string; authMethod: 'magic-link'; authContext?: { qrSessionId?: string } }
     isNewUser: boolean
   }>
@@ -136,7 +141,7 @@ export interface PasskeyMagicClient {
   // ── Session Management ──
 
   /** Validate the current session. Returns null if invalid/expired. */
-  getSession(): Promise<{ user: User; session: Session } | null>
+  getSession(): Promise<{ user: User<TUserMetadata>; session: Session } | null>
   /** List all active sessions. */
   listSessions(): Promise<{ sessions: Session[] }>
   /** Revoke the current session (logout). */
@@ -149,15 +154,15 @@ export interface PasskeyMagicClient {
   // ── Account Management ──
 
   /** Get the current user profile. */
-  getAccount(): Promise<{ user: User }>
+  getAccount(): Promise<{ user: User<TUserMetadata> }>
   /** Check if an email is available. */
   isEmailAvailable(email: string): Promise<boolean>
   /** Update metadata on the current account. */
-  updateAccountMetadata(metadata?: User['metadata']): Promise<{ user: User }>
+  updateAccountMetadata(metadata?: User<TUserMetadata>['metadata']): Promise<{ user: User<TUserMetadata> }>
   /** Link an email to the current account. */
-  linkEmail(email: string): Promise<{ user: User }>
+  linkEmail(email: string): Promise<{ user: User<TUserMetadata> }>
   /** Unlink the email from the current account. */
-  unlinkEmail(): Promise<{ user: User }>
+  unlinkEmail(): Promise<{ user: User<TUserMetadata> }>
   /** Delete the current account and all data. */
   deleteAccount(): Promise<void>
 }
@@ -183,12 +188,15 @@ export interface PasskeyMagicClient {
  * })
  * ```
  */
-export function createClient(config: ClientConfig): PasskeyMagicClient {
+export function createClient<
+  TUserMetadata extends MetadataObject = MetadataObject,
+  TCredentialMetadata extends MetadataObject = MetadataObject,
+>(config: ClientConfig): PasskeyMagicClient<TUserMetadata, TCredentialMetadata> {
   const passkey = createClientPasskeyManager(config)
   const qr = createClientQRManager(config)
   const magicLink = createClientMagicLinkManager(config)
 
-  const client: PasskeyMagicClient = {
+  const client: PasskeyMagicClient<TUserMetadata, TCredentialMetadata> = {
     passkeys: {
       register: (params) => passkey.register(params),
       signIn: (params) => passkey.authenticate(params),
@@ -227,7 +235,7 @@ export function createClient(config: ClientConfig): PasskeyMagicClient {
         return result.available
       },
       canLinkEmail: (email) => config.request('/account/can-link-email', { email }),
-      updateMetadata: (metadata: User['metadata']) => config.request('/account/update', { metadata }),
+      updateMetadata: (metadata: User<TUserMetadata>['metadata']) => config.request('/account/update', { metadata }),
       linkEmail: (email) => config.request('/account/link-email', { email }),
       unlinkEmail: () => config.request('/account/unlink-email', {}),
       async delete() {
@@ -296,7 +304,7 @@ export function createClient(config: ClientConfig): PasskeyMagicClient {
       const result = await config.request<{ available: boolean }>('/account/email-available', { email })
       return result.available
     },
-    updateAccountMetadata: (metadata: User['metadata']) => config.request('/account/update', { metadata }),
+    updateAccountMetadata: (metadata: User<TUserMetadata>['metadata']) => config.request('/account/update', { metadata }),
     async linkEmail(email) {
       return config.request('/account/link-email', { email })
     },

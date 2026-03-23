@@ -76,10 +76,13 @@ export interface QRSession {
 // ── Auth Results ──
 
 /** Discriminated union returned from all authentication flows. */
-export type AuthResult =
-  | { method: 'passkey'; user: User; session: Session }
-  | { method: 'magic-link'; user: User; session: Session; isNewUser: boolean }
-  | { method: 'qr'; user: User; session: Session }
+export type AuthResult<
+  TUserMetadata extends MetadataObject = MetadataObject,
+  TCredentialMetadata extends MetadataObject = MetadataObject,
+> =
+  | { method: 'passkey'; user: User<TUserMetadata>; session: Session }
+  | { method: 'magic-link'; user: User<TUserMetadata>; session: Session; isNewUser: boolean }
+  | { method: 'qr'; user: User<TUserMetadata>; session: Session }
 
 /** Result of checking whether an email can be linked to a user. */
 export type EmailLinkability =
@@ -94,19 +97,22 @@ export type EmailLinkability =
  * All methods must be safe to call concurrently. Implementations should
  * handle their own serialization of `Date` and `Uint8Array` fields.
  */
-export interface StorageAdapter {
+export interface StorageAdapter<
+  TUserMetadata extends MetadataObject = MetadataObject,
+  TCredentialMetadata extends MetadataObject = MetadataObject,
+> {
   // Users
-  createUser(user: User): Promise<User>
-  getUserById(id: string): Promise<User | null>
-  getUserByEmail(email: string): Promise<User | null>
-  updateUser(id: string, update: Partial<Pick<User, 'email' | 'metadata'>>): Promise<User>
+  createUser(user: User<TUserMetadata>): Promise<User<TUserMetadata>>
+  getUserById(id: string): Promise<User<TUserMetadata> | null>
+  getUserByEmail(email: string): Promise<User<TUserMetadata> | null>
+  updateUser(id: string, update: Partial<Pick<User<TUserMetadata>, 'email' | 'metadata'>>): Promise<User<TUserMetadata>>
   deleteUser(id: string): Promise<void>
 
   // Credentials (passkeys)
-  createCredential(credential: Credential): Promise<Credential>
-  getCredentialById(id: string): Promise<Credential | null>
-  getCredentialsByUserId(userId: string): Promise<Credential[]>
-  updateCredential(id: string, update: Partial<Pick<Credential, 'counter' | 'label' | 'metadata'>>): Promise<void>
+  createCredential(credential: Credential<TCredentialMetadata>): Promise<Credential<TCredentialMetadata>>
+  getCredentialById(id: string): Promise<Credential<TCredentialMetadata> | null>
+  getCredentialsByUserId(userId: string): Promise<Credential<TCredentialMetadata>[]>
+  updateCredential(id: string, update: Partial<Pick<Credential<TCredentialMetadata>, 'counter' | 'label' | 'metadata'>>): Promise<void>
   deleteCredential(id: string): Promise<void>
 
   // Sessions

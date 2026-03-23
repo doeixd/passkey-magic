@@ -1,5 +1,5 @@
 import type { Storage } from 'unstorage'
-import type { Credential, QRSession, Session, StorageAdapter, User } from '../types.js'
+import type { Credential, MetadataObject, QRSession, Session, StorageAdapter, User } from '../types.js'
 
 /** Options for the unstorage adapter. */
 export interface UnstorageAdapterOptions {
@@ -25,10 +25,13 @@ export interface UnstorageAdapterOptions {
  * {base}:qr:{id}                → QRSession
  * ```
  */
-export function unstorageAdapter(
+export function unstorageAdapter<
+  TUserMetadata extends MetadataObject = MetadataObject,
+  TCredentialMetadata extends MetadataObject = MetadataObject,
+>(
   storage: Storage,
   options: UnstorageAdapterOptions = {},
-): StorageAdapter {
+): StorageAdapter<TUserMetadata, TCredentialMetadata> {
   const base = options.base ?? 'auth'
   const k = (key: string) => `${base}:${key}`
 
@@ -36,24 +39,24 @@ export function unstorageAdapter(
     return JSON.parse(JSON.stringify(obj))
   }
 
-  function deserializeUser(raw: Record<string, unknown> | null): User | null {
+  function deserializeUser(raw: Record<string, unknown> | null): User<TUserMetadata> | null {
     if (!raw) return null
     return {
       ...raw,
       createdAt: new Date(raw.createdAt as string),
-      metadata: raw.metadata as User['metadata'] | undefined,
-    } as User
+      metadata: raw.metadata as User<TUserMetadata>['metadata'] | undefined,
+    } as User<TUserMetadata>
   }
 
-  function deserializeCredential(raw: Record<string, unknown> | null): Credential | null {
+  function deserializeCredential(raw: Record<string, unknown> | null): Credential<TCredentialMetadata> | null {
     if (!raw) return null
     const pk = raw.publicKey as Record<string, number>
     return {
       ...raw,
       publicKey: new Uint8Array(Object.values(pk)),
       createdAt: new Date(raw.createdAt as string),
-      metadata: raw.metadata as Credential['metadata'] | undefined,
-    } as Credential
+      metadata: raw.metadata as Credential<TCredentialMetadata>['metadata'] | undefined,
+    } as Credential<TCredentialMetadata>
   }
 
   function deserializeSession(raw: Record<string, unknown> | null): Session | null {
@@ -82,7 +85,7 @@ export function unstorageAdapter(
     return state === 'authenticated' || state === 'expired' || state === 'cancelled'
   }
 
-  const adapter: StorageAdapter = {
+  const adapter = {
     // ── Users ──
     async createUser(user) {
       await storage.setItem(k(`user:${user.id}`), serialize(user))
@@ -314,7 +317,7 @@ export function unstorageAdapter(
       Object.assign(raw, serialize(update))
       await storage.setItem(k(`qr:${id}`), raw)
     },
-  }
+  } as StorageAdapter<TUserMetadata, TCredentialMetadata>
 
   return adapter
 }

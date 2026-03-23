@@ -8,6 +8,7 @@ import type {
   EmailLinkability,
   EmailAdapter,
   MagicLinkMethods,
+  MetadataObject,
   QRSessionStatus,
   RegistrationResponseJSON,
   AuthenticationResponseJSON,
@@ -23,7 +24,10 @@ import { createQRSessionManager } from './qr-session.js'
 import { createHandler } from './handler.js'
 export { createMemoryRateLimiter } from './rate-limit.js'
 
-export interface PasskeyNamespace {
+export interface PasskeyNamespace<
+  TUserMetadata extends MetadataObject = MetadataObject,
+  TCredentialMetadata extends MetadataObject = MetadataObject,
+> {
   register: {
     start(params: { userId?: string; email?: string; userName?: string }): Promise<{
       options: PublicKeyCredentialCreationOptionsJSON
@@ -32,26 +36,29 @@ export interface PasskeyNamespace {
     finish(params: {
       userId: string
       response: RegistrationResponseJSON
-    }): Promise<AuthResult & { method: 'passkey'; credential: Credential }>
+    }): Promise<AuthResult<TUserMetadata, TCredentialMetadata> & { method: 'passkey'; credential: Credential<TCredentialMetadata> }>
   }
   signIn: {
     start(params?: { userId?: string }): Promise<{ options: PublicKeyCredentialRequestOptionsJSON }>
     finish(params: {
       response: AuthenticationResponseJSON
-    }): Promise<AuthResult & { method: 'passkey' }>
+    }): Promise<AuthResult<TUserMetadata, TCredentialMetadata> & { method: 'passkey' }>
   }
   add: {
     start(params: { userId: string; userName?: string }): Promise<{
       options: PublicKeyCredentialCreationOptionsJSON
     }>
-    finish(params: { userId: string; response: RegistrationResponseJSON }): Promise<{ credential: Credential }>
+    finish(params: { userId: string; response: RegistrationResponseJSON }): Promise<{ credential: Credential<TCredentialMetadata> }>
   }
-  list(userId: string): Promise<Credential[]>
-  update(params: { credentialId: string; label?: string; metadata?: Credential['metadata'] }): Promise<void>
+  list(userId: string): Promise<Credential<TCredentialMetadata>[]>
+  update(params: { credentialId: string; label?: string; metadata?: Credential<TCredentialMetadata>['metadata'] }): Promise<void>
   remove(credentialId: string): Promise<void>
 }
 
-export interface QRNamespace {
+export interface QRNamespace<
+  TUserMetadata extends MetadataObject = MetadataObject,
+  TCredentialMetadata extends MetadataObject = MetadataObject,
+> {
   /**
    * Create a desktop QR session.
    *
@@ -65,18 +72,21 @@ export interface QRNamespace {
   complete(params: {
     sessionId: string
     response: AuthenticationResponseJSON
-  }): Promise<AuthResult & { method: 'qr' }>
+  }): Promise<AuthResult<TUserMetadata, TCredentialMetadata> & { method: 'qr' }>
   cancel(params: { sessionId: string; statusToken: string }): Promise<void>
 }
 
-export interface MagicLinkNamespace {
+export interface MagicLinkNamespace<
+  TUserMetadata extends MetadataObject = MetadataObject,
+  TCredentialMetadata extends MetadataObject = MetadataObject,
+> {
   send(params: { email: string }): Promise<{ sent: true }>
-  verify(params: { token: string }): Promise<AuthResult & { method: 'magic-link' }>
+  verify(params: { token: string }): Promise<AuthResult<TUserMetadata, TCredentialMetadata> & { method: 'magic-link' }>
 }
 
-export interface AccountNamespace {
-  get(userId: string): Promise<User | null>
-  getByEmail(email: string): Promise<User | null>
+export interface AccountNamespace<TUserMetadata extends MetadataObject = MetadataObject> {
+  get(userId: string): Promise<User<TUserMetadata> | null>
+  getByEmail(email: string): Promise<User<TUserMetadata> | null>
   /**
    * Returns whether an email is currently unused.
    *
@@ -85,24 +95,27 @@ export interface AccountNamespace {
    */
   isEmailAvailable(email: string): Promise<boolean>
   canLinkEmail(params: { userId: string; email: string }): Promise<EmailLinkability>
-  updateMetadata(params: { userId: string; metadata?: User['metadata'] }): Promise<{ user: User }>
-  linkEmail(params: { userId: string; email: string }): Promise<{ user: User }>
-  unlinkEmail(params: { userId: string }): Promise<{ user: User }>
+  updateMetadata(params: { userId: string; metadata?: User<TUserMetadata>['metadata'] }): Promise<{ user: User<TUserMetadata> }>
+  linkEmail(params: { userId: string; email: string }): Promise<{ user: User<TUserMetadata> }>
+  unlinkEmail(params: { userId: string }): Promise<{ user: User<TUserMetadata> }>
   delete(userId: string): Promise<void>
 }
 
 // ── Base methods (always available) ──
 
 /** Methods available on every `createAuth()` instance regardless of config. */
-export interface BaseAuthMethods {
+export interface BaseAuthMethods<
+  TUserMetadata extends MetadataObject = MetadataObject,
+  TCredentialMetadata extends MetadataObject = MetadataObject,
+> {
   /** High-level passkey namespace. */
-  passkeys: PasskeyNamespace
+  passkeys: PasskeyNamespace<TUserMetadata, TCredentialMetadata>
 
   /** High-level QR namespace. */
-  qr: QRNamespace
+  qr: QRNamespace<TUserMetadata, TCredentialMetadata>
 
   /** High-level account and identity namespace. */
-  accounts: AccountNamespace
+  accounts: AccountNamespace<TUserMetadata>
 
   // ── Passkey Registration ──
 
@@ -123,7 +136,7 @@ export interface BaseAuthMethods {
   verifyRegistration(params: {
     userId: string
     response: RegistrationResponseJSON
-  }): Promise<AuthResult & { method: 'passkey'; credential: Credential }>
+  }): Promise<AuthResult<TUserMetadata, TCredentialMetadata> & { method: 'passkey'; credential: Credential<TCredentialMetadata> }>
 
   // ── Passkey Authentication ──
 
@@ -135,7 +148,7 @@ export interface BaseAuthMethods {
   /** Verify a WebAuthn authentication response and create a session. */
   verifyAuthentication(params: {
     response: AuthenticationResponseJSON
-  }): Promise<AuthResult & { method: 'passkey' }>
+  }): Promise<AuthResult<TUserMetadata, TCredentialMetadata> & { method: 'passkey' }>
 
   // ── Passkey Management (authenticated users) ──
 
@@ -155,7 +168,7 @@ export interface BaseAuthMethods {
   verifyAddPasskey(params: {
     userId: string
     response: RegistrationResponseJSON
-  }): Promise<{ credential: Credential }>
+  }): Promise<{ credential: Credential<TCredentialMetadata> }>
 
   /**
    * Update a credential's metadata (e.g. label).
@@ -164,14 +177,14 @@ export interface BaseAuthMethods {
   updateCredential(params: {
     credentialId: string
     label?: string
-    metadata?: Credential['metadata']
+    metadata?: Credential<TCredentialMetadata>['metadata']
   }): Promise<void>
 
   /** Remove a passkey. Verifies the credential exists and cleans up. */
   removeCredential(credentialId: string): Promise<void>
 
   /** List all passkeys for a user. */
-  getUserCredentials(userId: string): Promise<Credential[]>
+  getUserCredentials(userId: string): Promise<Credential<TCredentialMetadata>[]>
 
   // ── QR Cross-Device ──
 
@@ -199,12 +212,12 @@ export interface BaseAuthMethods {
   completeQRSession(params: {
     sessionId: string
     response: AuthenticationResponseJSON
-  }): Promise<AuthResult & { method: 'qr' }>
+  }): Promise<AuthResult<TUserMetadata, TCredentialMetadata> & { method: 'qr' }>
 
   // ── Session Management ──
 
   /** Validate a session token. Returns user + session if valid, null if expired/invalid. */
-  validateSession(token: string): Promise<{ user: User; session: Session } | null>
+  validateSession(token: string): Promise<{ user: User<TUserMetadata>; session: Session } | null>
 
   /** List all active sessions for a user. */
   getUserSessions(userId: string): Promise<Session[]>
@@ -221,7 +234,7 @@ export interface BaseAuthMethods {
   // ── Account Management ──
 
   /** Get a user by ID. Returns `null` if not found. */
-  getUser(userId: string): Promise<User | null>
+  getUser(userId: string): Promise<User<TUserMetadata> | null>
 
   /**
    * Check if an email is available (not already linked to a user).
@@ -232,20 +245,20 @@ export interface BaseAuthMethods {
   isEmailAvailable(email: string): Promise<boolean>
 
   /** Update account metadata for a user. */
-  updateUserMetadata(params: { userId: string; metadata?: User['metadata'] }): Promise<{ user: User }>
+  updateUserMetadata(params: { userId: string; metadata?: User<TUserMetadata>['metadata'] }): Promise<{ user: User<TUserMetadata> }>
 
   /**
    * Link an email to a user account.
    * @throws If the email is already linked to another user.
    * @throws If the email format is invalid.
    */
-  linkEmail(params: { userId: string; email: string }): Promise<{ user: User }>
+  linkEmail(params: { userId: string; email: string }): Promise<{ user: User<TUserMetadata> }>
 
   /**
    * Unlink the email from a user account.
    * @throws If the user has no email linked.
    */
-  unlinkEmail(params: { userId: string }): Promise<{ user: User }>
+  unlinkEmail(params: { userId: string }): Promise<{ user: User<TUserMetadata> }>
 
   /**
    * Delete a user account and all associated data (credentials, sessions).
@@ -270,8 +283,12 @@ export interface BaseAuthMethods {
 // ── Conditional type: adds magic link methods only when email adapter exists ──
 
 /** Full auth instance type. Magic link methods are present only when `EmailAdapter` is configured. */
-export type AuthInstance<TEmail> = BaseAuthMethods &
-  (TEmail extends EmailAdapter ? MagicLinkMethods & { magicLinks: MagicLinkNamespace } : unknown)
+export type AuthInstance<
+  TEmail,
+  TUserMetadata extends MetadataObject = MetadataObject,
+  TCredentialMetadata extends MetadataObject = MetadataObject,
+> = BaseAuthMethods<TUserMetadata, TCredentialMetadata> &
+  (TEmail extends EmailAdapter ? MagicLinkMethods & { magicLinks: MagicLinkNamespace<TUserMetadata, TCredentialMetadata> } : unknown)
 
 // ── Default TTLs ──
 
@@ -308,9 +325,13 @@ const FIVE_MINUTES = 5 * 60 * 1000
  * auth.sendMagicLink({ email: 'user@example.com' }) // ✓ type-safe
  * ```
  */
-export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
-  config: AuthConfig<TEmail>,
-): AuthInstance<TEmail> {
+export function createAuth<
+  TUserMetadata extends MetadataObject = MetadataObject,
+  TCredentialMetadata extends MetadataObject = MetadataObject,
+  TEmail extends EmailAdapter | undefined = undefined,
+>(
+  config: AuthConfig<TEmail> & { storage: import('../types.js').StorageAdapter<TUserMetadata, TCredentialMetadata> },
+): AuthInstance<TEmail, TUserMetadata, TCredentialMetadata> {
   const emitter = new AuthEmitter()
   const hooks = config.hooks ?? {}
 
@@ -332,7 +353,7 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
     generateId: config.generateId,
   })
 
-  const base: BaseAuthMethods = {
+  const base = {
     passkeys: undefined as unknown as PasskeyNamespace,
     qr: undefined as unknown as QRNamespace,
     accounts: undefined as unknown as AccountNamespace,
@@ -587,7 +608,7 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
         rateLimit: config.rateLimit,
       })
     },
-  }
+  } as BaseAuthMethods<TUserMetadata, TCredentialMetadata>
 
   base.passkeys = {
     register: {
@@ -619,7 +640,7 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
     get: (userId) => base.getUser(userId),
     getByEmail: async (email) => {
       if (!isValidEmail(email)) return null
-      return config.storage.getUserByEmail(email)
+      return config.storage.getUserByEmail(email) as Promise<User<TUserMetadata> | null>
     },
     isEmailAvailable: (email) => base.isEmailAvailable(email),
     async canLinkEmail({ userId, email }) {
@@ -646,7 +667,7 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
       generateId: config.generateId,
     })
 
-    const magicLinkMethods: MagicLinkMethods & { magicLinks: MagicLinkNamespace } = {
+    const magicLinkMethods = {
       async sendMagicLink({ email }) {
         if (hooks.beforeMagicLink) {
           const result = await hooks.beforeMagicLink({ email })
@@ -677,12 +698,12 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
         send: (params) => magicLinkMethods.sendMagicLink(params),
         verify: (params) => magicLinkMethods.verifyMagicLink(params),
       },
-    }
+    } as MagicLinkMethods & { magicLinks: MagicLinkNamespace<TUserMetadata, TCredentialMetadata> }
 
     Object.assign(base, magicLinkMethods)
   }
 
-  return base as AuthInstance<TEmail>
+  return base as AuthInstance<TEmail, TUserMetadata, TCredentialMetadata>
 }
 
 // Re-export types

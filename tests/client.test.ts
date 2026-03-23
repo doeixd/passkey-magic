@@ -1,5 +1,7 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, expectTypeOf, vi } from 'vitest'
 import { createClient } from '../src/client/index.js'
+import { createAuth } from '../src/server/index.js'
+import { memoryAdapter } from '../src/adapters/memory.js'
 
 describe('createClient grouped helpers', () => {
   it('exposes account helpers through grouped namespace', async () => {
@@ -81,5 +83,38 @@ describe('createClient grouped helpers', () => {
 
     expect(result?.user.id).toBe('u1')
     expect(request).toHaveBeenCalledWith('/session')
+  })
+
+  it('carries metadata generics through client and server APIs', () => {
+    type UserMeta = { theme: 'dark' | 'light' }
+    type CredentialMeta = { nickname: string }
+
+    const client = createClient<UserMeta, CredentialMeta>({
+      request: vi.fn(async () => ({})) as any,
+    })
+
+    expectTypeOf(client.accounts.updateMetadata).parameter(0).toEqualTypeOf<UserMeta | undefined>()
+    expectTypeOf(client.passkeys.update).parameter(0).toEqualTypeOf<{
+      credentialId: string
+      label?: string
+      metadata?: CredentialMeta
+    }>()
+
+    const auth = createAuth<UserMeta, CredentialMeta>({
+      rpName: 'Test App',
+      rpID: 'localhost',
+      origin: 'http://localhost:3000',
+      storage: memoryAdapter<UserMeta, CredentialMeta>(),
+    })
+
+    expectTypeOf(auth.accounts.updateMetadata).parameter(0).toEqualTypeOf<{
+      userId: string
+      metadata?: UserMeta
+    }>()
+    expectTypeOf(auth.passkeys.update).parameter(0).toEqualTypeOf<{
+      credentialId: string
+      label?: string
+      metadata?: CredentialMeta
+    }>()
   })
 })
