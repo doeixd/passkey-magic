@@ -1,5 +1,5 @@
 import { createAuth } from '../server/index.js'
-import type { StorageAdapter, EmailAdapter, Credential, QRSession } from '../types.js'
+import type { StorageAdapter, EmailAdapter, Credential, MetadataObject, QRSession } from '../types.js'
 import type { BetterAuthPlugin } from 'better-auth'
 import type { BetterAuthClientPlugin } from 'better-auth'
 import { createAuthEndpoint, sessionMiddleware } from 'better-auth/api'
@@ -37,6 +37,7 @@ const passkeyCredentialSchema = {
     backedUp: { type: 'boolean' as const, required: true },
     transports: { type: 'string' as const, required: false },
     label: { type: 'string' as const, required: false },
+    metadata: { type: 'string' as const, required: false },
     createdAt: { type: 'date' as const, required: true },
   },
 }
@@ -131,6 +132,25 @@ function createBridgedStorage(adapter: BetterAuthAdapter): StorageAdapter {
   const pmSessionsByToken = new Map<string, string>() // token → id
   const pmSessionsByUser = new Map<string, Set<string>>() // userId → Set<id>
 
+  function serializeMetadata(metadata: MetadataObject | undefined): string | null {
+    return metadata ? JSON.stringify(metadata) : null
+  }
+
+  function deserializeMetadata(value: unknown): MetadataObject | undefined {
+    if (!value) return undefined
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value) as MetadataObject
+      } catch {
+        return undefined
+      }
+    }
+    if (typeof value === 'object' && !Array.isArray(value)) {
+      return value as MetadataObject
+    }
+    return undefined
+  }
+
   return {
     // ── Users ──
     async createUser(user) {
@@ -155,7 +175,12 @@ function createBridgedStorage(adapter: BetterAuthAdapter): StorageAdapter {
         where: [{ field: 'id', value: id }],
       })
       if (!row) return null
-      return { id: row.id, email: row.email ?? undefined, createdAt: new Date(row.createdAt) }
+      return {
+        id: row.id,
+        email: row.email ?? undefined,
+        createdAt: new Date(row.createdAt),
+        metadata: deserializeMetadata(row.metadata),
+      }
     },
     async getUserByEmail(email) {
       const row = await adapter.findOne<any>({
@@ -163,16 +188,29 @@ function createBridgedStorage(adapter: BetterAuthAdapter): StorageAdapter {
         where: [{ field: 'email', value: email }],
       })
       if (!row) return null
-      return { id: row.id, email: row.email ?? undefined, createdAt: new Date(row.createdAt) }
+      return {
+        id: row.id,
+        email: row.email ?? undefined,
+        createdAt: new Date(row.createdAt),
+        metadata: deserializeMetadata(row.metadata),
+      }
     },
     async updateUser(id, update) {
       const row = await adapter.update<any>({
         model: 'user',
         where: [{ field: 'id', value: id }],
-        update,
+        update: {
+          ...update,
+          metadata: update.metadata === undefined ? undefined : serializeMetadata(update.metadata),
+        },
       })
       if (!row) throw new Error('User not found')
-      return { id: row.id, email: row.email ?? undefined, createdAt: new Date(row.createdAt) }
+      return {
+        id: row.id,
+        email: row.email ?? undefined,
+        createdAt: new Date(row.createdAt),
+        metadata: deserializeMetadata(row.metadata),
+      }
     },
     async deleteUser(id) {
       await adapter.delete({ model: 'user', where: [{ field: 'id', value: id }] })
@@ -191,6 +229,7 @@ function createBridgedStorage(adapter: BetterAuthAdapter): StorageAdapter {
           backedUp: credential.backedUp,
           transports: credential.transports ? JSON.stringify(credential.transports) : null,
           label: credential.label ?? null,
+          metadata: serializeMetadata(credential.metadata),
           createdAt: credential.createdAt,
         },
         forceAllowId: true,
@@ -225,7 +264,10 @@ function createBridgedStorage(adapter: BetterAuthAdapter): StorageAdapter {
       await adapter.update({
         model: 'passkeyCredential',
         where: [{ field: 'id', value: id }],
-        update,
+        update: {
+          ...update,
+          metadata: update.metadata === undefined ? undefined : serializeMetadata(update.metadata),
+        },
       })
     },
     async deleteCredential(id) {
@@ -409,6 +451,7 @@ function rowToCredential(row: any): Credential {
     backedUp: row.backedUp,
     transports: row.transports ? JSON.parse(row.transports) : undefined,
     label: row.label ?? undefined,
+    metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
     createdAt: new Date(row.createdAt),
   }
 }
@@ -623,7 +666,8 @@ export function passkeyMagicPlugin(options: PasskeyMagicPluginOptions) {
           use: [sessionMiddleware],
           body: z.object({
             credentialId: z.string(),
-            label: z.string(),
+            label: z.string().optional(),
+            metadata: z.record(z.string(), z.any()).optional(),
           }),
         },
         async (ctx) => {
@@ -636,8 +680,29 @@ export function passkeyMagicPlugin(options: PasskeyMagicPluginOptions) {
           await auth.updateCredential({
             credentialId: ctx.body.credentialId,
             label: ctx.body.label,
+            metadata: ctx.body.metadata,
           })
           return ctx.json({ success: true })
+        },
+      ),
+
+      passkeyMagicAccountUpdate: createAuthEndpoint(
+        '/passkey-magic/account/update',
+        {
+          method: 'POST',
+          use: [sessionMiddleware],
+          body: z.object({
+            metadata: z.record(z.string(), z.any()).optional(),
+          }),
+        },
+        async (ctx) => {
+          const auth = getAuth(ctx)
+          const userId = ctx.context.session.user.id
+          const result = await auth.updateUserMetadata({
+            userId,
+            metadata: ctx.body.metadata,
+          })
+          return ctx.json(result)
         },
       ),
 

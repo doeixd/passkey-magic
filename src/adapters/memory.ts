@@ -26,19 +26,36 @@ export function memoryAdapter(): StorageAdapter {
     return state === 'authenticated' || state === 'expired' || state === 'cancelled'
   }
 
+  function cloneMetadata<T>(value: T): T {
+    if (value === undefined) return value
+    return JSON.parse(JSON.stringify(value)) as T
+  }
+
+  function cloneUser(user: User): User {
+    return { ...user, metadata: cloneMetadata(user.metadata) }
+  }
+
+  function cloneCredential(cred: Credential): Credential {
+    return { ...cred, metadata: cloneMetadata(cred.metadata) }
+  }
+
+  function cloneSession(session: Session): Session {
+    return { ...session, authContext: cloneMetadata(session.authContext) }
+  }
+
   return {
     // ── Users ──
     async createUser(user) {
-      users.set(user.id, { ...user })
-      return { ...user }
+      users.set(user.id, cloneUser(user))
+      return cloneUser(user)
     },
     async getUserById(id) {
       const user = users.get(id)
-      return user ? { ...user } : null
+      return user ? cloneUser(user) : null
     },
     async getUserByEmail(email) {
       for (const user of users.values()) {
-        if (user.email === email) return { ...user }
+        if (user.email === email) return cloneUser(user)
       }
       return null
     },
@@ -46,8 +63,8 @@ export function memoryAdapter(): StorageAdapter {
       const user = users.get(id)
       if (!user) throw new Error(`User not found: ${id}`)
       const updated = { ...user, ...update }
-      users.set(id, updated)
-      return { ...updated }
+      users.set(id, cloneUser(updated))
+      return cloneUser(updated)
     },
     async deleteUser(id) {
       users.delete(id)
@@ -55,17 +72,17 @@ export function memoryAdapter(): StorageAdapter {
 
     // ── Credentials ──
     async createCredential(cred) {
-      credentials.set(cred.id, { ...cred })
-      return { ...cred }
+      credentials.set(cred.id, cloneCredential(cred))
+      return cloneCredential(cred)
     },
     async getCredentialById(id) {
       const cred = credentials.get(id)
-      return cred ? { ...cred } : null
+      return cred ? cloneCredential(cred) : null
     },
     async getCredentialsByUserId(userId) {
       const result: Credential[] = []
       for (const cred of credentials.values()) {
-        if (cred.userId === userId) result.push({ ...cred })
+        if (cred.userId === userId) result.push(cloneCredential(cred))
       }
       return result
     },
@@ -74,6 +91,7 @@ export function memoryAdapter(): StorageAdapter {
       if (!cred) throw new Error(`Credential not found: ${id}`)
       if (update.counter !== undefined) cred.counter = update.counter
       if (update.label !== undefined) cred.label = update.label
+      if (update.metadata !== undefined) cred.metadata = cloneMetadata(update.metadata)
     },
     async deleteCredential(id) {
       credentials.delete(id)
@@ -81,8 +99,8 @@ export function memoryAdapter(): StorageAdapter {
 
     // ── Sessions ──
     async createSession(session) {
-      sessions.set(session.id, { ...session })
-      return { ...session }
+      sessions.set(session.id, cloneSession(session))
+      return cloneSession(session)
     },
     async getSessionByToken(token) {
       for (const session of sessions.values()) {
@@ -91,7 +109,7 @@ export function memoryAdapter(): StorageAdapter {
             sessions.delete(session.id)
             return null
           }
-          return { ...session }
+          return cloneSession(session)
         }
       }
       return null
@@ -103,7 +121,7 @@ export function memoryAdapter(): StorageAdapter {
           if (new Date() > session.expiresAt) {
             sessions.delete(session.id)
           } else {
-            result.push({ ...session })
+            result.push(cloneSession(session))
           }
         }
       }

@@ -14,13 +14,14 @@ describe('unstorageAdapter', () => {
   // ── Users ──
 
   describe('users', () => {
-    const user: User = { id: 'u1', email: 'test@example.com', createdAt: new Date() }
+    const user: User = { id: 'u1', email: 'test@example.com', createdAt: new Date(), metadata: { plan: 'pro' } }
 
     it('creates and retrieves a user by id', async () => {
       await adapter.createUser(user)
       const found = await adapter.getUserById('u1')
       expect(found?.id).toBe('u1')
       expect(found?.email).toBe('test@example.com')
+      expect(found?.metadata).toEqual({ plan: 'pro' })
       expect(found?.createdAt).toBeInstanceOf(Date)
     })
 
@@ -37,8 +38,9 @@ describe('unstorageAdapter', () => {
 
     it('updates a user email', async () => {
       await adapter.createUser({ id: 'u2', createdAt: new Date() })
-      const updated = await adapter.updateUser('u2', { email: 'new@example.com' })
+      const updated = await adapter.updateUser('u2', { email: 'new@example.com', metadata: { color: 'blue' } })
       expect(updated.email).toBe('new@example.com')
+      expect(updated.metadata).toEqual({ color: 'blue' })
 
       // Lookup by new email works
       const found = await adapter.getUserByEmail('new@example.com')
@@ -72,6 +74,7 @@ describe('unstorageAdapter', () => {
       deviceType: 'singleDevice',
       backedUp: false,
       createdAt: new Date(),
+      metadata: { nickname: 'Laptop key' },
     }
 
     it('creates and retrieves credential by id', async () => {
@@ -101,6 +104,13 @@ describe('unstorageAdapter', () => {
       await adapter.updateCredential('cred1', { label: 'YubiKey' })
       const found = await adapter.getCredentialById('cred1')
       expect(found?.label).toBe('YubiKey')
+    })
+
+    it('updates metadata', async () => {
+      await adapter.createCredential(cred)
+      await adapter.updateCredential('cred1', { metadata: { nickname: 'Desk key' } })
+      const found = await adapter.getCredentialById('cred1')
+      expect(found?.metadata).toEqual({ nickname: 'Desk key' })
     })
 
     it('deletes credential and updates index', async () => {

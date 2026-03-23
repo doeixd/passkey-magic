@@ -658,6 +658,43 @@ describe('createAuth', () => {
       expect(await canLinkRes.json()).toEqual({ ok: true })
     })
 
+    it('updates account and credential metadata via handler', async () => {
+      const auth = makeAuth()
+      const handler = auth.createHandler()
+
+      await storage.createUser({ id: 'u1', email: 'a@b.com', createdAt: new Date() })
+      await storage.createCredential({
+        id: 'c1', userId: 'u1', publicKey: new Uint8Array([1]), counter: 0,
+        deviceType: 'singleDevice', backedUp: false, createdAt: new Date(),
+      })
+      await storage.createSession({
+        id: 's1', token: 'valid-token', userId: 'u1', authMethod: 'passkey',
+        expiresAt: new Date(Date.now() + 10000), createdAt: new Date(),
+      })
+
+      const accountRes = await handler(new Request('http://localhost/auth/account/update', {
+        method: 'POST',
+        body: JSON.stringify({ metadata: { tier: 'pro' } }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer valid-token',
+        },
+      }))
+      expect(accountRes.status).toBe(200)
+      expect((await auth.getUser('u1'))?.metadata).toEqual({ tier: 'pro' })
+
+      const credRes = await handler(new Request('http://localhost/auth/account/credentials/c1', {
+        method: 'POST',
+        body: JSON.stringify({ metadata: { nickname: 'Phone' } }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer valid-token',
+        },
+      }))
+      expect(credRes.status).toBe(200)
+      expect((await auth.getUserCredentials('u1'))[0].metadata).toEqual({ nickname: 'Phone' })
+    })
+
     it('lists sessions for authenticated user', async () => {
       const auth = makeAuth()
       const handler = auth.createHandler()

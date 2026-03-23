@@ -16,6 +16,11 @@ describe('createClient grouped helpers', () => {
         if (email === 'taken@example.com') return { ok: false, reason: 'email_in_use' }
         return { ok: true }
       }
+      if (endpoint === '/account/update') {
+        return {
+          user: { id: 'u1', email: 'current@example.com', createdAt: new Date(), metadata: (body as any).metadata },
+        }
+      }
       if (endpoint === '/account/link-email') {
         return { user: { id: 'u1', email: (body as { email: string }).email, createdAt: new Date() } }
       }
@@ -43,10 +48,12 @@ describe('createClient grouped helpers', () => {
     })
 
     await client.accounts.linkEmail('next@example.com')
+    await client.accounts.updateMetadata({ theme: 'dark' })
     await client.accounts.unlinkEmail()
     await client.accounts.delete()
 
     expect(request).toHaveBeenCalledWith('/account/link-email', { email: 'next@example.com' })
+    expect(request).toHaveBeenCalledWith('/account/update', { metadata: { theme: 'dark' } })
     expect(request).toHaveBeenCalledWith('/account/unlink-email', {})
     expect(request).toHaveBeenCalledWith('/account/delete', {})
   })

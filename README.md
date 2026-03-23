@@ -167,6 +167,20 @@ await auth.passkeys.update({ credentialId: 'cred_123', label: 'iPhone' })
 await auth.passkeys.remove('cred_123')
 ```
 
+Both users and passkeys can also carry JSON metadata.
+
+```ts
+await auth.accounts.updateMetadata({
+  userId,
+  metadata: { plan: 'pro', onboardingComplete: true },
+})
+
+await auth.passkeys.update({
+  credentialId: 'cred_123',
+  metadata: { nickname: 'Work MacBook', platform: 'macos' },
+})
+```
+
 ### Accounts And Identity
 
 ```ts

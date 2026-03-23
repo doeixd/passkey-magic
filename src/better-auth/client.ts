@@ -6,6 +6,7 @@ import type {
   AuthenticationResponseJSON,
   RegistrationResponseJSON,
 } from '@simplewebauthn/server'
+import type { Credential, User } from '../types.js'
 
 interface BetterAuthFetch {
   <T = unknown>(path: string, options?: {
@@ -42,7 +43,7 @@ export const passkeyMagicClientPlugin = () =>
           },
           list: () =>
             $fetch('/passkey-magic/credentials', { method: 'GET' }),
-          update: (body: { credentialId: string; label: string }) =>
+          update: (body: { credentialId: string; label?: string; metadata?: Credential['metadata'] }) =>
             $fetch('/passkey-magic/credentials/update', { method: 'POST', body }),
           remove: (body: { credentialId: string }) =>
             $fetch('/passkey-magic/credentials/remove', { method: 'POST', body }),
@@ -66,6 +67,8 @@ export const passkeyMagicClientPlugin = () =>
         accounts: {
           canLinkEmail: (body: { email: string }) =>
             $fetch('/passkey-magic/account/can-link-email', { method: 'POST', body }),
+          updateMetadata: (body: { metadata?: User['metadata'] }) =>
+            $fetch('/passkey-magic/account/update', { method: 'POST', body }),
         },
       },
     }),

@@ -38,7 +38,11 @@ export function unstorageAdapter(
 
   function deserializeUser(raw: Record<string, unknown> | null): User | null {
     if (!raw) return null
-    return { ...raw, createdAt: new Date(raw.createdAt as string) } as User
+    return {
+      ...raw,
+      createdAt: new Date(raw.createdAt as string),
+      metadata: raw.metadata as User['metadata'] | undefined,
+    } as User
   }
 
   function deserializeCredential(raw: Record<string, unknown> | null): Credential | null {
@@ -48,6 +52,7 @@ export function unstorageAdapter(
       ...raw,
       publicKey: new Uint8Array(Object.values(pk)),
       createdAt: new Date(raw.createdAt as string),
+      metadata: raw.metadata as Credential['metadata'] | undefined,
     } as Credential
   }
 
@@ -163,6 +168,7 @@ export function unstorageAdapter(
       if (!raw) throw new Error(`Credential not found: ${id}`)
       if (update.counter !== undefined) raw.counter = update.counter
       if (update.label !== undefined) raw.label = update.label
+      if (update.metadata !== undefined) raw.metadata = update.metadata
       await storage.setItem(k(`cred:${id}`), raw)
     },
 

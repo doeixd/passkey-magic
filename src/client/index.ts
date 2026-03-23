@@ -22,7 +22,7 @@ export interface PasskeyMagicClient {
     }>
     add: (params?: { userName?: string }) => Promise<{ credential: { id: string } }>
     list(userId?: string): Promise<{ credentials: Credential[] }>
-    update(params: { credentialId: string; label: string }): Promise<void>
+    update(params: { credentialId: string; label?: string; metadata?: Credential['metadata'] }): Promise<void>
     remove(credentialId: string): Promise<void>
   }
 
@@ -49,6 +49,7 @@ export interface PasskeyMagicClient {
     get(): Promise<{ user: User }>
     isEmailAvailable(email: string): Promise<boolean>
     canLinkEmail(email: string): Promise<EmailLinkability>
+    updateMetadata(metadata?: User['metadata']): Promise<{ user: User }>
     linkEmail(email: string): Promise<{ user: User }>
     unlinkEmail(): Promise<{ user: User }>
     delete(): Promise<void>
@@ -89,7 +90,7 @@ export interface PasskeyMagicClient {
   /** Add a passkey to the current account (requires auth). */
   addPasskey(params?: { userName?: string }): Promise<{ credential: { id: string } }>
   /** Update a passkey label. */
-  updateCredential(params: { credentialId: string; label: string }): Promise<void>
+  updateCredential(params: { credentialId: string; label?: string; metadata?: Credential['metadata'] }): Promise<void>
   /** Remove a passkey. */
   removeCredential(credentialId: string): Promise<void>
   /** List all passkeys for the current user. */
@@ -147,6 +148,8 @@ export interface PasskeyMagicClient {
   getAccount(): Promise<{ user: User }>
   /** Check if an email is available. */
   isEmailAvailable(email: string): Promise<boolean>
+  /** Update metadata on the current account. */
+  updateAccountMetadata(metadata?: User['metadata']): Promise<{ user: User }>
   /** Link an email to the current account. */
   linkEmail(email: string): Promise<{ user: User }>
   /** Unlink the email from the current account. */
@@ -194,8 +197,8 @@ export function createClient(config: ClientConfig): PasskeyMagicClient {
         return config.request('/passkey/add/verify', { response })
       },
       list: () => config.request('/account/credentials'),
-      async update({ credentialId, label }) {
-        await config.request(`/account/credentials/${credentialId}`, { label })
+      async update({ credentialId, label, metadata }) {
+        await config.request(`/account/credentials/${credentialId}`, { label, metadata })
       },
       async remove(credentialId) {
         await config.request(`/account/credentials/${credentialId}/delete`, {})
@@ -220,6 +223,7 @@ export function createClient(config: ClientConfig): PasskeyMagicClient {
         return result.available
       },
       canLinkEmail: (email) => config.request('/account/can-link-email', { email }),
+      updateMetadata: (metadata: User['metadata']) => config.request('/account/update', { metadata }),
       linkEmail: (email) => config.request('/account/link-email', { email }),
       unlinkEmail: () => config.request('/account/unlink-email', {}),
       async delete() {
@@ -243,8 +247,8 @@ export function createClient(config: ClientConfig): PasskeyMagicClient {
       const response = await startRegistration({ optionsJSON: options })
       return config.request('/passkey/add/verify', { response })
     },
-    async updateCredential({ credentialId, label }) {
-      await config.request(`/account/credentials/${credentialId}`, { label })
+    async updateCredential({ credentialId, label, metadata }) {
+      await config.request(`/account/credentials/${credentialId}`, { label, metadata })
     },
     async removeCredential(credentialId) {
       await config.request(`/account/credentials/${credentialId}/delete`, {})
@@ -288,6 +292,7 @@ export function createClient(config: ClientConfig): PasskeyMagicClient {
       const result = await config.request<{ available: boolean }>('/account/email-available', { email })
       return result.available
     },
+    updateAccountMetadata: (metadata: User['metadata']) => config.request('/account/update', { metadata }),
     async linkEmail(email) {
       return config.request('/account/link-email', { email })
     },

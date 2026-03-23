@@ -45,7 +45,7 @@ export interface PasskeyNamespace {
     finish(params: { userId: string; response: RegistrationResponseJSON }): Promise<{ credential: Credential }>
   }
   list(userId: string): Promise<Credential[]>
-  update(params: { credentialId: string; label: string }): Promise<void>
+  update(params: { credentialId: string; label?: string; metadata?: Credential['metadata'] }): Promise<void>
   remove(credentialId: string): Promise<void>
 }
 
@@ -70,6 +70,7 @@ export interface AccountNamespace {
   getByEmail(email: string): Promise<User | null>
   isEmailAvailable(email: string): Promise<boolean>
   canLinkEmail(params: { userId: string; email: string }): Promise<EmailLinkability>
+  updateMetadata(params: { userId: string; metadata?: User['metadata'] }): Promise<{ user: User }>
   linkEmail(params: { userId: string; email: string }): Promise<{ user: User }>
   unlinkEmail(params: { userId: string }): Promise<{ user: User }>
   delete(userId: string): Promise<void>
@@ -147,7 +148,8 @@ export interface BaseAuthMethods {
    */
   updateCredential(params: {
     credentialId: string
-    label: string
+    label?: string
+    metadata?: Credential['metadata']
   }): Promise<void>
 
   /** Remove a passkey. Verifies the credential exists and cleans up. */
@@ -206,6 +208,9 @@ export interface BaseAuthMethods {
    * Useful before showing a registration form.
    */
   isEmailAvailable(email: string): Promise<boolean>
+
+  /** Update account metadata for a user. */
+  updateUserMetadata(params: { userId: string; metadata?: User['metadata'] }): Promise<{ user: User }>
 
   /**
    * Link an email to a user account.
@@ -380,10 +385,13 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
       return { credential }
     },
 
-    async updateCredential({ credentialId, label }) {
+    async updateCredential({ credentialId, label, metadata }) {
       const cred = await config.storage.getCredentialById(credentialId)
       if (!cred) throw new Error('Credential not found')
-      await config.storage.updateCredential(credentialId, { label })
+      if (label === undefined && metadata === undefined) {
+        throw new Error('No credential updates provided')
+      }
+      await config.storage.updateCredential(credentialId, { label, metadata })
       emitter.emit('credential:updated', { credentialId, userId: cred.userId })
     },
 
@@ -491,6 +499,11 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
       return existing === null
     },
 
+    async updateUserMetadata({ userId, metadata }) {
+      const user = await config.storage.updateUser(userId, { metadata })
+      return { user }
+    },
+
     async linkEmail({ userId, email }) {
       if (!isValidEmail(email)) {
         throw new Error('Invalid email address')
@@ -593,6 +606,7 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
       }
       return { ok: true }
     },
+    updateMetadata: (params) => base.updateUserMetadata(params),
     linkEmail: (params) => base.linkEmail(params),
     unlinkEmail: (params) => base.unlinkEmail(params),
     delete: (userId) => base.deleteAccount(userId),

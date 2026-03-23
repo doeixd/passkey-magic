@@ -12,7 +12,7 @@ describe('memoryAdapter', () => {
   // ── Users ──
 
   describe('users', () => {
-    const user: User = { id: 'u1', email: 'test@example.com', createdAt: new Date() }
+    const user: User = { id: 'u1', email: 'test@example.com', createdAt: new Date(), metadata: { role: 'admin' } }
 
     it('creates and retrieves a user by id', async () => {
       await storage.createUser(user)
@@ -33,17 +33,21 @@ describe('memoryAdapter', () => {
 
     it('updates a user', async () => {
       await storage.createUser({ id: 'u2', createdAt: new Date() })
-      const updated = await storage.updateUser('u2', { email: 'new@example.com' })
+      const updated = await storage.updateUser('u2', { email: 'new@example.com', metadata: { theme: 'light' } })
       expect(updated.email).toBe('new@example.com')
+      expect(updated.metadata).toEqual({ theme: 'light' })
       const fetched = await storage.getUserById('u2')
       expect(fetched?.email).toBe('new@example.com')
+      expect(fetched?.metadata).toEqual({ theme: 'light' })
     })
 
     it('returns independent copies (no mutation)', async () => {
       const created = await storage.createUser(user)
       created.email = 'mutated@example.com'
+      created.metadata = { role: 'user' }
       const fetched = await storage.getUserById('u1')
       expect(fetched?.email).toBe('test@example.com')
+      expect(fetched?.metadata).toEqual({ role: 'admin' })
     })
 
     it('deletes a user', async () => {
@@ -64,6 +68,7 @@ describe('memoryAdapter', () => {
       deviceType: 'singleDevice',
       backedUp: false,
       createdAt: new Date(),
+      metadata: { nickname: 'Phone' },
     }
 
     it('creates and retrieves credential by id', async () => {
@@ -92,6 +97,13 @@ describe('memoryAdapter', () => {
       await storage.updateCredential('cred1', { label: 'My iPhone' })
       const found = await storage.getCredentialById('cred1')
       expect(found?.label).toBe('My iPhone')
+    })
+
+    it('updates metadata', async () => {
+      await storage.createCredential(cred)
+      await storage.updateCredential('cred1', { metadata: { nickname: 'Work key' } })
+      const found = await storage.getCredentialById('cred1')
+      expect(found?.metadata).toEqual({ nickname: 'Work key' })
     })
 
     it('throws when updating nonexistent credential', async () => {

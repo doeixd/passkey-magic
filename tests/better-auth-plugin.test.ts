@@ -117,11 +117,12 @@ describe('passkeyMagicPlugin', () => {
     it('defines account identity endpoints', () => {
       const plugin = makePlugin()
       expect(plugin.endpoints.passkeyMagicAccountCanLinkEmail).toBeDefined()
+      expect(plugin.endpoints.passkeyMagicAccountUpdate).toBeDefined()
     })
 
-    it('has 16 total endpoints', () => {
+    it('has 17 total endpoints', () => {
       const plugin = makePlugin()
-      expect(Object.keys(plugin.endpoints)).toHaveLength(16)
+      expect(Object.keys(plugin.endpoints)).toHaveLength(17)
     })
   })
 })
@@ -150,9 +151,11 @@ describe('passkeyMagicClientPlugin', () => {
     expect(actions?.passkeyMagic.qr.status).toBeTypeOf('function')
     expect(actions?.passkeyMagic.magicLinks.send).toBeTypeOf('function')
     expect(actions?.passkeyMagic.accounts.canLinkEmail).toBeTypeOf('function')
+    expect(actions?.passkeyMagic.accounts.updateMetadata).toBeTypeOf('function')
 
     await actions?.passkeyMagic.qr.status('qr-1')
     await actions?.passkeyMagic.accounts.canLinkEmail({ email: 'user@example.com' })
+    await actions?.passkeyMagic.accounts.updateMetadata({ metadata: { theme: 'dark' } })
 
     expect($fetch).toHaveBeenCalledWith('/passkey-magic/qr/status', {
       method: 'GET',
@@ -161,6 +164,10 @@ describe('passkeyMagicClientPlugin', () => {
     expect($fetch).toHaveBeenCalledWith('/passkey-magic/account/can-link-email', {
       method: 'POST',
       body: { email: 'user@example.com' },
+    })
+    expect($fetch).toHaveBeenCalledWith('/passkey-magic/account/update', {
+      method: 'POST',
+      body: { metadata: { theme: 'dark' } },
     })
   })
 

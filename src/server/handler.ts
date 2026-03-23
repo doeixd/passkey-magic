@@ -2,6 +2,7 @@ import type { AuthInstance } from './index.js'
 import type {
   AuthenticationResponseJSON,
   EmailAdapter,
+  MetadataObject,
   RegistrationResponseJSON,
   User,
   Session,
@@ -33,6 +34,8 @@ interface HandlerOptions {
  * DELETE /session                    — Revoke current session (Bearer token)
  * POST /session/revoke               — Revoke current session (client compatibility)
  * GET  /account                      — Get current user (authed)
+ * PATCH /account                     — Update account metadata (authed)
+ * POST /account/update               — Update account metadata (client compatibility)
  * GET  /account/sessions             — List user sessions (authed)
  * DELETE /account/sessions/:id       — Revoke specific session (authed)
  * POST /account/sessions/:id/delete  — Revoke specific session (client compatibility)
@@ -226,6 +229,26 @@ export function createHandler(
         return json({ user })
       }
 
+      if (path === '/account' && request.method === 'PATCH') {
+        const { user } = await requireAuth(request)
+        const body = await readJSON(request)
+        const result = await auth.updateUserMetadata({
+          userId: user.id,
+          metadata: expectOptionalMetadata(body, 'metadata'),
+        })
+        return json(result)
+      }
+
+      if (path === '/account/update' && request.method === 'POST') {
+        const { user } = await requireAuth(request)
+        const body = await readJSON(request)
+        const result = await auth.updateUserMetadata({
+          userId: user.id,
+          metadata: expectOptionalMetadata(body, 'metadata'),
+        })
+        return json(result)
+      }
+
       if (path === '/account' && request.method === 'DELETE') {
         const { user } = await requireAuth(request)
         await auth.deleteAccount(user.id)
@@ -292,9 +315,13 @@ export function createHandler(
           throw new HttpError(404, 'Credential not found')
         }
         const body = await readJSON(request)
+        if (body.label === undefined && body.metadata === undefined) {
+          throw new HttpError(400, 'Missing or invalid field: label or metadata')
+        }
         await auth.updateCredential({
           credentialId: credPatchMatch[1],
-          label: expectString(body, 'label'),
+          label: expectOptionalString(body, 'label'),
+          metadata: expectOptionalMetadata(body, 'metadata'),
         })
         return json({ ok: true })
       }
@@ -422,6 +449,15 @@ function expectObject<T = Record<string, unknown>>(body: Record<string, unknown>
     throw new HttpError(400, `Missing or invalid field: ${key}`)
   }
   return value as T
+}
+
+function expectOptionalMetadata(body: Record<string, unknown>, key: string): MetadataObject | undefined {
+  const value = body[key]
+  if (value === undefined || value === null) return undefined
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new HttpError(400, `Invalid field: ${key} (expected object)`)
+  }
+  return value as MetadataObject
 }
 
 /** Known client-side errors that should return 400 instead of 500. */

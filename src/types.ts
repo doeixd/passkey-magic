@@ -7,15 +7,26 @@ import type {
 
 // ── Core Entities ──
 
+export type MetadataValue =
+  | string
+  | number
+  | boolean
+  | null
+  | MetadataValue[]
+  | { [key: string]: MetadataValue }
+
+export type MetadataObject = { [key: string]: MetadataValue }
+
 /** A registered user account. */
-export interface User {
+export interface User<TMetadata extends MetadataObject = MetadataObject> {
   id: string
   email?: string
   createdAt: Date
+  metadata?: TMetadata
 }
 
 /** A WebAuthn credential (passkey) associated with a user. */
-export interface Credential {
+export interface Credential<TMetadata extends MetadataObject = MetadataObject> {
   id: string
   userId: string
   publicKey: Uint8Array
@@ -26,6 +37,7 @@ export interface Credential {
   /** Human-readable label (e.g. "iPhone", "YubiKey"). */
   label?: string
   createdAt: Date
+  metadata?: TMetadata
 }
 
 /** An authenticated session bound to a user. */
@@ -86,14 +98,14 @@ export interface StorageAdapter {
   createUser(user: User): Promise<User>
   getUserById(id: string): Promise<User | null>
   getUserByEmail(email: string): Promise<User | null>
-  updateUser(id: string, update: Partial<Pick<User, 'email'>>): Promise<User>
+  updateUser(id: string, update: Partial<Pick<User, 'email' | 'metadata'>>): Promise<User>
   deleteUser(id: string): Promise<void>
 
   // Credentials (passkeys)
   createCredential(credential: Credential): Promise<Credential>
   getCredentialById(id: string): Promise<Credential | null>
   getCredentialsByUserId(userId: string): Promise<Credential[]>
-  updateCredential(id: string, update: Partial<Pick<Credential, 'counter' | 'label'>>): Promise<void>
+  updateCredential(id: string, update: Partial<Pick<Credential, 'counter' | 'label' | 'metadata'>>): Promise<void>
   deleteCredential(id: string): Promise<void>
 
   // Sessions
