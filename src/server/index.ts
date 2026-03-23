@@ -1,5 +1,6 @@
 import type {
   AuthConfig,
+  AuthRateLimitConfig,
   AuthEventHandler,
   AuthEventMap,
   AuthResult,
@@ -20,6 +21,7 @@ import { createPasskeyManager } from './passkey.js'
 import { createMagicLinkManager } from './magic-link.js'
 import { createQRSessionManager } from './qr-session.js'
 import { createHandler } from './handler.js'
+export { createMemoryRateLimiter } from './rate-limit.js'
 
 export interface PasskeyNamespace {
   register: {
@@ -262,7 +264,7 @@ export interface BaseAuthMethods {
    * Create a Web Standard `Request → Response` handler for all auth routes.
    * Works with any framework that speaks `Request`/`Response` (Bun, Deno, CF Workers, Hono, etc.).
    */
-  createHandler(opts?: { pathPrefix?: string }): (request: Request) => Promise<Response>
+  createHandler(opts?: { pathPrefix?: string; rateLimit?: AuthRateLimitConfig }): (request: Request) => Promise<Response>
 }
 
 // ── Conditional type: adds magic link methods only when email adapter exists ──
@@ -580,7 +582,10 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
 
     // ── Handler ──
     createHandler(opts) {
-      return createHandler(this as AuthInstance<EmailAdapter | undefined>, opts)
+      return createHandler(this as AuthInstance<EmailAdapter | undefined>, {
+        ...opts,
+        rateLimit: config.rateLimit,
+      })
     },
   }
 

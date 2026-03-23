@@ -1,5 +1,7 @@
 import type { AuthInstance } from './index.js'
 import type {
+  AuthRateLimitConfig,
+  RateLimitRoute,
   AuthenticationResponseJSON,
   EmailAdapter,
   MetadataObject,
@@ -7,10 +9,13 @@ import type {
   User,
   Session,
 } from '../types.js'
+import { createMemoryRateLimiter, getDefaultRateLimitRule, makeRateLimitKey, normalizeIdentifier } from './rate-limit.js'
 
 interface HandlerOptions {
   /** Route prefix. Defaults to `"/auth"`. */
   pathPrefix?: string
+  /** Optional rate limiting configuration for sensitive public routes. */
+  rateLimit?: AuthRateLimitConfig
 }
 
 const MAX_TOKEN_LENGTH = 1024
@@ -64,6 +69,19 @@ export function createHandler(
   opts: HandlerOptions = {},
 ): (request: Request) => Promise<Response> {
   const prefix = (opts.pathPrefix ?? '/auth').replace(/\/$/, '')
+  const limiter = opts.rateLimit?.limiter ?? createMemoryRateLimiter()
+
+  async function enforceRateLimit(route: RateLimitRoute, keyParts: string[]): Promise<void> {
+    const rule = opts.rateLimit?.rules?.[route] ?? getDefaultRateLimitRule(route)
+    if (rule === null) return
+
+    const normalizedParts = await Promise.all(keyParts.map((part) => normalizeIdentifier(part)))
+    const key = await makeRateLimitKey([route, ...normalizedParts])
+    const decision = await limiter.check({ route, key, limit: rule.limit, windowMs: rule.windowMs })
+    if (!decision.allowed) {
+      throw new HttpError(429, `Rate limit exceeded for ${route}`)
+    }
+  }
 
   async function authenticate(request: Request): Promise<{ user: User; session: Session } | null> {
     const token = extractBearerToken(request)
@@ -75,6 +93,14 @@ export function createHandler(
     const result = await authenticate(request)
     if (!result) throw new HttpError(401, 'Authentication required')
     return result
+  }
+
+  function getClientAddress(request: Request): string {
+    const forwarded = request.headers.get('x-forwarded-for')
+    if (forwarded) return forwarded.split(',')[0].trim()
+    return request.headers.get('cf-connecting-ip')
+      ?? request.headers.get('x-real-ip')
+      ?? 'unknown'
   }
 
   return async (request: Request): Promise<Response> => {
@@ -92,6 +118,7 @@ export function createHandler(
 
       if (path === '/passkey/register/options' && request.method === 'POST') {
         const body = await readJSON(request)
+        await enforceRateLimit('passkey.register.options', [getClientAddress(request)])
         const result = await auth.generateRegistrationOptions({
           userId: expectOptionalString(body, 'userId'),
           email: expectOptionalString(body, 'email'),
@@ -113,6 +140,10 @@ export function createHandler(
 
       if (path === '/passkey/authenticate/options' && request.method === 'POST') {
         const body = await readJSON(request)
+        await enforceRateLimit('passkey.authenticate.options', [
+          getClientAddress(request),
+          expectOptionalString(body, 'userId') ?? 'discoverable',
+        ])
         const result = await auth.generateAuthenticationOptions({
           userId: expectOptionalString(body, 'userId'),
         })
@@ -121,6 +152,7 @@ export function createHandler(
 
       if (path === '/passkey/authenticate/verify' && request.method === 'POST') {
         const body = await readJSON(request)
+        await enforceRateLimit('passkey.authenticate.verify', [getClientAddress(request)])
         const result = await auth.verifyAuthentication({
           response: expectObject<AuthenticationResponseJSON>(body, 'response'),
         })
@@ -156,8 +188,10 @@ export function createHandler(
           return json({ error: 'Magic link not configured' }, 400)
         }
         const body = await readJSON(request)
+        const email = expectEmailString(body, 'email')
+        await enforceRateLimit('magicLink.send', [getClientAddress(request), email])
         const result = await (auth as AuthInstance<EmailAdapter>).sendMagicLink({
-          email: expectEmailString(body, 'email'),
+          email,
         })
         return json(result)
       }
@@ -167,6 +201,7 @@ export function createHandler(
           return json({ error: 'Magic link not configured' }, 400)
         }
         const body = await readJSON(request)
+        await enforceRateLimit('magicLink.verify', [getClientAddress(request)])
         const result = await (auth as AuthInstance<EmailAdapter>).verifyMagicLink({
           token: expectTokenString(body, 'token'),
         })
@@ -176,6 +211,7 @@ export function createHandler(
       // ── QR Sessions ──
 
       if (path === '/qr/create' && request.method === 'POST') {
+        await enforceRateLimit('qr.create', [getClientAddress(request)])
         return json(await auth.createQRSession())
       }
 
@@ -387,7 +423,9 @@ export function createHandler(
 
       if (path === '/account/email-available' && request.method === 'POST') {
         const body = await readJSON(request)
-        const available = await auth.isEmailAvailable(expectEmailString(body, 'email'))
+        const email = expectEmailString(body, 'email')
+        await enforceRateLimit('email.available', [getClientAddress(request), email])
+        const available = await auth.isEmailAvailable(email)
         return json({ available })
       }
 

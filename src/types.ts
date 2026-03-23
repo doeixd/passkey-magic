@@ -185,6 +185,50 @@ export interface AuthEventMap {
 /** Typed event handler for a specific auth event. */
 export type AuthEventHandler<K extends keyof AuthEventMap> = (event: AuthEventMap[K]) => void
 
+// ── Rate Limiting ──
+
+export type RateLimitRoute =
+  | 'passkey.register.options'
+  | 'passkey.authenticate.options'
+  | 'passkey.authenticate.verify'
+  | 'magicLink.send'
+  | 'magicLink.verify'
+  | 'qr.create'
+  | 'email.available'
+
+export interface RateLimitRule {
+  /** Maximum allowed requests within the window. */
+  limit: number
+  /** Window length in milliseconds. */
+  windowMs: number
+}
+
+export interface RateLimitCheck {
+  route: RateLimitRoute
+  key: string
+  limit: number
+  windowMs: number
+}
+
+export interface RateLimitDecision {
+  allowed: boolean
+  retryAfterMs?: number
+}
+
+export interface AuthRateLimiter {
+  check(input: RateLimitCheck): Promise<RateLimitDecision>
+}
+
+export interface AuthRateLimitConfig {
+  /**
+   * Custom limiter implementation. Defaults to an in-memory fixed-window limiter.
+   * For multi-instance deployments, provide a shared backend implementation.
+   */
+  limiter?: AuthRateLimiter
+  /** Per-route overrides. Set a route to `null` to disable rate limiting for it. */
+  rules?: Partial<Record<RateLimitRoute, RateLimitRule | null>>
+}
+
 // ── Config ──
 
 /** Configuration for `createAuth()`. */
@@ -213,6 +257,8 @@ export interface AuthConfig<TEmail extends EmailAdapter | undefined = undefined>
   generateId?: () => string
   /** Lifecycle hooks. */
   hooks?: AuthHooks
+  /** Optional rate limiting for sensitive public routes. */
+  rateLimit?: AuthRateLimitConfig
 }
 
 // ── Magic Link conditional methods ──

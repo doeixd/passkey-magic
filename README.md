@@ -27,6 +27,11 @@ const auth = createAuth({
   rpID: 'example.com',
   origin: 'https://example.com',
   storage: memoryAdapter(),
+  rateLimit: {
+    rules: {
+      'magicLink.send': { limit: 5, windowMs: 15 * 60 * 1000 },
+    },
+  },
 })
 
 // Use as a Web Standard Request handler
@@ -228,6 +233,27 @@ On the client, session validation uses the authenticated request transport direc
 
 ```ts
 const current = await auth.getSession()
+```
+
+### Rate Limiting
+
+Sensitive public routes are rate-limited by default with an in-memory limiter.
+
+For production, prefer a shared limiter implementation across instances.
+
+```ts
+import { createAuth, createMemoryRateLimiter } from 'passkey-magic/server'
+
+const auth = createAuth({
+  // ...auth config
+  rateLimit: {
+    limiter: createMemoryRateLimiter(),
+    rules: {
+      'magicLink.send': { limit: 5, windowMs: 15 * 60 * 1000 },
+      'email.available': null, // disable if you handle this elsewhere
+    },
+  },
+})
 ```
 
 ### Lifecycle Hooks
