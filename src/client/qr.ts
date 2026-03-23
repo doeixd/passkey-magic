@@ -14,6 +14,11 @@ export interface ClientQRManager {
     statusToken: string,
     opts?: { interval?: number; signal?: AbortSignal },
   ): AsyncIterable<QRSessionStatus>
+  waitForAuthentication(
+    sessionId: string,
+    statusToken: string,
+    opts?: { interval?: number; signal?: AbortSignal; timeoutMs?: number },
+  ): Promise<{ token: string; expiresAt: string }>
   confirmSession(params: { sessionId: string; confirmationCode: string }): Promise<void>
   completeSession(params: { sessionId: string; confirmationCode?: string }): Promise<void>
   cancelSession(params: { sessionId: string; statusToken: string }): Promise<void>
@@ -57,6 +62,25 @@ export function createClientQRManager(config: ClientConfig): ClientQRManager {
           }, { once: true })
         })
       }
+    },
+
+    async waitForAuthentication(sessionId, statusToken, opts) {
+      const startedAt = Date.now()
+      for await (const status of this.pollSession(sessionId, statusToken, opts)) {
+        if (status.state === 'authenticated' && status.session) {
+          return status.session
+        }
+        if (status.state === 'expired') {
+          throw new Error('QR session expired')
+        }
+        if (status.state === 'cancelled') {
+          throw new Error('QR session cancelled')
+        }
+        if (opts?.timeoutMs && Date.now() - startedAt >= opts.timeoutMs) {
+          throw new Error('QR session timed out')
+        }
+      }
+      throw new Error('QR session stopped before authentication')
     },
 
     async confirmSession({ sessionId, confirmationCode }) {

@@ -5,6 +5,36 @@ import { createClientMagicLinkManager } from './magic-link.js'
 
 type ClientUser<TUserMetadata extends MetadataObject> = Pick<User<TUserMetadata>, 'id' | 'email' | 'metadata'>
 
+export class AuthClientError extends Error {
+  code: 'AUTH_CLIENT_ERROR'
+  status?: number
+  cause?: unknown
+
+  constructor(message: string, options?: { status?: number; cause?: unknown }) {
+    super(message)
+    this.name = 'AuthClientError'
+    this.code = 'AUTH_CLIENT_ERROR'
+    this.status = options?.status
+    this.cause = options?.cause
+  }
+}
+
+export function normalizeAuthClientError(error: unknown): AuthClientError {
+  if (error instanceof AuthClientError) return error
+
+  const message =
+    typeof error === 'object' && error !== null && 'message' in error && typeof (error as { message: unknown }).message === 'string'
+      ? (error as { message: string }).message
+      : 'Authentication request failed'
+
+  const status =
+    typeof error === 'object' && error !== null && 'status' in error && typeof (error as { status: unknown }).status === 'number'
+      ? (error as { status: number }).status
+      : undefined
+
+  return new AuthClientError(message, { status, cause: error })
+}
+
 /**
  * Client-side auth interface. All methods delegate to the server
  * via the `request` function you provide in config.
@@ -38,6 +68,12 @@ export interface PasskeyMagicClient<
     renderText(url: string, opts?: { border?: number }): string
     /** Poll QR status with the desktop-only `statusToken`. */
     poll(sessionId: string, statusToken: string, opts?: { interval?: number; signal?: AbortSignal }): AsyncIterable<QRSessionStatus>
+    /** Wait until QR authentication completes or terminally fails. */
+    waitForAuthentication(
+      sessionId: string,
+      statusToken: string,
+      opts?: { interval?: number; signal?: AbortSignal; timeoutMs?: number },
+    ): Promise<{ token: string; expiresAt: string }>
     /** Confirm a QR session using the desktop-shown short code when enabled. */
     confirm(params: { sessionId: string; confirmationCode: string }): Promise<void>
     complete(params: { sessionId: string; confirmationCode?: string }): Promise<void>
@@ -47,6 +83,13 @@ export interface PasskeyMagicClient<
   magicLinks: {
     request(params: { email: string }): Promise<{ sent: true }>
     verify(params: { token: string }): Promise<{
+      method: 'magic-link'
+      user: ClientUser<TUserMetadata>
+      session: { token: string; expiresAt: string; authMethod: 'magic-link'; authContext?: { qrSessionId?: string } }
+      isNewUser: boolean
+    }>
+    extractToken(input: string | URL): string
+    verifyURL(params: { url: string | URL }): Promise<{
       method: 'magic-link'
       user: ClientUser<TUserMetadata>
       session: { token: string; expiresAt: string; authMethod: 'magic-link'; authContext?: { qrSessionId?: string } }
@@ -123,6 +166,12 @@ export interface PasskeyMagicClient<
     statusToken: string,
     opts?: { interval?: number; signal?: AbortSignal },
   ): AsyncIterable<QRSessionStatus>
+  /** Wait for QR authentication to succeed or fail terminally. */
+  waitForQRSession(
+    sessionId: string,
+    statusToken: string,
+    opts?: { interval?: number; signal?: AbortSignal; timeoutMs?: number },
+  ): Promise<{ token: string; expiresAt: string }>
   /** Complete a QR session from the scanning device (authenticates with passkey). */
   confirmQRSession(params: { sessionId: string; confirmationCode: string }): Promise<void>
   completeQRSession(params: { sessionId: string; confirmationCode?: string }): Promise<void>
@@ -135,6 +184,15 @@ export interface PasskeyMagicClient<
   requestMagicLink(params: { email: string }): Promise<{ sent: true }>
   /** Verify a magic link token and create a session. */
   verifyMagicLink(params: { token: string }): Promise<{
+    method: 'magic-link'
+    user: ClientUser<TUserMetadata>
+    session: { token: string; expiresAt: string; authMethod: 'magic-link'; authContext?: { qrSessionId?: string } }
+    isNewUser: boolean
+  }>
+  /** Extract a magic-link token from a callback URL. */
+  extractMagicLinkToken(input: string | URL): string
+  /** Verify a magic-link token directly from a callback URL. */
+  verifyMagicLinkURL(params: { url: string | URL }): Promise<{
     method: 'magic-link'
     user: ClientUser<TUserMetadata>
     session: { token: string; expiresAt: string; authMethod: 'magic-link'; authContext?: { qrSessionId?: string } }
@@ -195,28 +253,36 @@ export function createClient<
   TUserMetadata extends MetadataObject = MetadataObject,
   TCredentialMetadata extends MetadataObject = MetadataObject,
 >(config: ClientConfig): PasskeyMagicClient<TUserMetadata, TCredentialMetadata> {
-  const passkey = createClientPasskeyManager(config)
-  const qr = createClientQRManager(config)
-  const magicLink = createClientMagicLinkManager(config)
+  const request: ClientConfig['request'] = async <T = unknown>(endpoint: string, body?: unknown): Promise<T> => {
+    try {
+      return await config.request<T>(endpoint, body)
+    } catch (error) {
+      throw normalizeAuthClientError(error)
+    }
+  }
+
+  const passkey = createClientPasskeyManager({ request })
+  const qr = createClientQRManager({ request })
+  const magicLink = createClientMagicLinkManager({ request })
 
   const client: PasskeyMagicClient<TUserMetadata, TCredentialMetadata> = {
     passkeys: {
       register: (params) => passkey.register(params),
       signIn: (params) => passkey.authenticate(params),
       async add(params) {
-        const { options } = await config.request<{
+        const { options } = await request<{
           options: Parameters<typeof import('@simplewebauthn/browser').startRegistration>[0]['optionsJSON']
         }>('/passkey/add/options', params ?? {})
         const { startRegistration } = await import('@simplewebauthn/browser')
         const response = await startRegistration({ optionsJSON: options })
-        return config.request('/passkey/add/verify', { response })
+        return request('/passkey/add/verify', { response })
       },
-      list: () => config.request('/account/credentials'),
+      list: () => request('/account/credentials'),
       async update({ credentialId, label, metadata }) {
-        await config.request(`/account/credentials/${credentialId}`, { label, metadata })
+        await request(`/account/credentials/${credentialId}`, { label, metadata })
       },
       async remove(credentialId) {
-        await config.request(`/account/credentials/${credentialId}/delete`, {})
+        await request(`/account/credentials/${credentialId}/delete`, {})
       },
     },
     qr: {
@@ -224,6 +290,7 @@ export function createClient<
       render: (url, opts) => qr.renderSVG(url, opts),
       renderText: (url, opts) => qr.renderText(url, opts),
       poll: (id, statusToken, opts) => qr.pollSession(id, statusToken, opts),
+      waitForAuthentication: (id, statusToken, opts) => qr.waitForAuthentication(id, statusToken, opts),
       confirm: (params) => qr.confirmSession(params),
       complete: (params) => qr.completeSession(params),
       cancel: (params) => qr.cancelSession(params),
@@ -231,19 +298,21 @@ export function createClient<
     magicLinks: {
       request: (params) => magicLink.send(params),
       verify: (params) => magicLink.verify(params),
+      extractToken: (input) => magicLink.extractToken(input),
+      verifyURL: ({ url }) => magicLink.verifyURL(url),
     },
     accounts: {
-      get: () => config.request('/account'),
+      get: () => request('/account'),
       async isEmailAvailable(email) {
-        const result = await config.request<{ available: boolean }>('/account/email-available', { email })
+        const result = await request<{ available: boolean }>('/account/email-available', { email })
         return result.available
       },
-      canLinkEmail: (email) => config.request('/account/can-link-email', { email }),
-      updateMetadata: (metadata: User<TUserMetadata>['metadata']) => config.request('/account/update', { metadata }),
-      linkEmail: (email) => config.request('/account/link-email', { email }),
-      unlinkEmail: () => config.request('/account/unlink-email', {}),
+      canLinkEmail: (email) => request('/account/can-link-email', { email }),
+      updateMetadata: (metadata: User<TUserMetadata>['metadata']) => request('/account/update', { metadata }),
+      linkEmail: (email) => request('/account/link-email', { email }),
+      unlinkEmail: () => request('/account/unlink-email', {}),
       async delete() {
-        await config.request('/account/delete', {})
+        await request('/account/delete', {})
       },
     },
 
@@ -256,26 +325,27 @@ export function createClient<
 
     // Passkey management
     async addPasskey(params) {
-      const { options } = await config.request<{
+      const { options } = await request<{
         options: Parameters<typeof import('@simplewebauthn/browser').startRegistration>[0]['optionsJSON']
       }>('/passkey/add/options', params ?? {})
       const { startRegistration } = await import('@simplewebauthn/browser')
       const response = await startRegistration({ optionsJSON: options })
-      return config.request('/passkey/add/verify', { response })
+      return request('/passkey/add/verify', { response })
     },
     async updateCredential({ credentialId, label, metadata }) {
-      await config.request(`/account/credentials/${credentialId}`, { label, metadata })
+      await request(`/account/credentials/${credentialId}`, { label, metadata })
     },
     async removeCredential(credentialId) {
-      await config.request(`/account/credentials/${credentialId}/delete`, {})
+      await request(`/account/credentials/${credentialId}/delete`, {})
     },
-    listCredentials: () => config.request('/account/credentials'),
+    listCredentials: () => request('/account/credentials'),
 
     // QR
     createQRSession: () => qr.createSession(),
     renderQR: (url, opts) => qr.renderSVG(url, opts),
     renderQRText: (url, opts) => qr.renderText(url, opts),
     pollQRSession: (id, statusToken, opts) => qr.pollSession(id, statusToken, opts),
+    waitForQRSession: (id, statusToken, opts) => qr.waitForAuthentication(id, statusToken, opts),
     confirmQRSession: (params) => qr.confirmSession(params),
     completeQRSession: (params) => qr.completeSession(params),
     cancelQRSession: (params) => qr.cancelSession(params),
@@ -283,41 +353,43 @@ export function createClient<
     // Magic link
     requestMagicLink: (params) => magicLink.send(params),
     verifyMagicLink: (params) => magicLink.verify(params),
+    extractMagicLinkToken: (input) => magicLink.extractToken(input),
+    verifyMagicLinkURL: ({ url }) => magicLink.verifyURL(url),
 
     // Session
     async getSession() {
       try {
-        return await config.request('/session')
+        return await request('/session')
       } catch {
         return null
       }
     },
-    listSessions: () => config.request('/account/sessions'),
+    listSessions: () => request('/account/sessions'),
     async revokeSession() {
-      await config.request('/session/revoke', {})
+      await request('/session/revoke', {})
     },
     async revokeSessionById(sessionId) {
-      await config.request(`/account/sessions/${sessionId}/delete`, {})
+      await request(`/account/sessions/${sessionId}/delete`, {})
     },
     async revokeAllSessions() {
-      await config.request('/account/sessions/delete-all', {})
+      await request('/account/sessions/delete-all', {})
     },
 
     // Account
-    getAccount: () => config.request('/account'),
+    getAccount: () => request('/account'),
     async isEmailAvailable(email) {
-      const result = await config.request<{ available: boolean }>('/account/email-available', { email })
+      const result = await request<{ available: boolean }>('/account/email-available', { email })
       return result.available
     },
-    updateAccountMetadata: (metadata: User<TUserMetadata>['metadata']) => config.request('/account/update', { metadata }),
+    updateAccountMetadata: (metadata: User<TUserMetadata>['metadata']) => request('/account/update', { metadata }),
     async linkEmail(email) {
-      return config.request('/account/link-email', { email })
+      return request('/account/link-email', { email })
     },
     async unlinkEmail() {
-      return config.request('/account/unlink-email', {})
+      return request('/account/unlink-email', {})
     },
     async deleteAccount() {
-      await config.request('/account/delete', {})
+      await request('/account/delete', {})
     },
   }
 

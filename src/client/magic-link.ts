@@ -9,6 +9,13 @@ export interface ClientMagicLinkManager {
     session: { token: string; expiresAt: string; authMethod: 'magic-link'; authContext?: { qrSessionId?: string } }
     isNewUser: boolean
   }>
+  extractToken(input: string | URL): string
+  verifyURL(input: string | URL): Promise<{
+    method: 'magic-link'
+    user: { id: string; email?: string }
+    session: { token: string; expiresAt: string; authMethod: 'magic-link'; authContext?: { qrSessionId?: string } }
+    isNewUser: boolean
+  }>
 }
 
 export function createClientMagicLinkManager(config: ClientConfig): ClientMagicLinkManager {
@@ -19,6 +26,20 @@ export function createClientMagicLinkManager(config: ClientConfig): ClientMagicL
 
     async verify({ token }) {
       return config.request('/magic-link/verify', { token })
+    },
+
+    extractToken(input) {
+      const url = typeof input === 'string' ? new URL(input, 'http://localhost') : input
+      const token = url.searchParams.get('token')
+      if (!token) {
+        throw new Error('Magic link token missing from URL')
+      }
+      return token
+    },
+
+    async verifyURL(input) {
+      const token = this.extractToken(input)
+      return this.verify({ token })
     },
   }
 }

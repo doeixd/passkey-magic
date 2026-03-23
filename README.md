@@ -68,6 +68,26 @@ const { user, session } = await auth.passkeys.register({ email: 'user@example.co
 const result = await auth.passkeys.signIn()
 ```
 
+Client ergonomics helpers are also available:
+
+```ts
+import { AuthClientError, createClient } from 'passkey-magic/client'
+
+const auth = createClient({ request })
+
+try {
+  await auth.accounts.get()
+} catch (error) {
+  if (error instanceof AuthClientError) {
+    console.error(error.status, error.message)
+  }
+}
+
+const session = await auth.waitForQRSession(sessionId, statusToken)
+const token = auth.extractMagicLinkToken(window.location.href)
+await auth.verifyMagicLinkURL({ url: window.location.href })
+```
+
 ## Features
 
 ## Identity Model
