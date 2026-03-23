@@ -200,6 +200,8 @@ export type RateLimitRoute =
   | 'magicLink.send'
   | 'magicLink.verify'
   | 'qr.create'
+  | 'qr.scan'
+  | 'qr.complete'
   | 'email.available'
 
 export interface RateLimitRule {

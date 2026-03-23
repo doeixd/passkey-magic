@@ -119,6 +119,15 @@ QR login is modeled as a short-lived state machine. Sessions move through `creat
 
 Polling stops automatically once the session reaches `authenticated`, `expired`, or `cancelled`.
 
+Security model:
+
+- `sessionId` inside the QR code is a bearer capability for attempting mobile completion.
+- `statusToken` is a separate desktop-only secret used for polling and cancellation.
+- Possession of `sessionId` alone does not reveal desktop status, but it does allow a scanner to attempt authentication into that desktop flow.
+- In other words, whoever scans the QR first can try to complete login on the desktop if they can also satisfy mobile authentication.
+
+This is acceptable for many QR login designs, but it is not equivalent to strong desktop/mobile device binding. If you need stronger protection against QR capture or confused-deputy style flow hijacking, add a desktop confirmation step or short approval code in your application UX.
+
 ```ts
 // Desktop: create session and display QR code
 const { sessionId, statusToken } = await auth.qr.create()
@@ -137,6 +146,13 @@ await auth.qr.complete({ sessionId })
 // Optional: cancel an in-flight QR login
 await auth.qr.cancel({ sessionId, statusToken })
 ```
+
+Operational guidance:
+
+- rate limit QR create, scan, and complete endpoints
+- keep QR session TTLs short
+- do not log `statusToken`
+- treat the QR code itself as sensitive until scanned or expired
 
 ### Magic Links
 

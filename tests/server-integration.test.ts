@@ -681,6 +681,42 @@ describe('createAuth', () => {
       expect(second.status).toBe(429)
     })
 
+    it('rate limits QR scan and complete when configured', async () => {
+      const auth = makeAuth({
+        rateLimit: {
+          rules: {
+            'qr.scan': { limit: 1, windowMs: 60_000 },
+            'qr.complete': { limit: 1, windowMs: 60_000 },
+          },
+        },
+      })
+      const handler = auth.createHandler()
+
+      const createRes = await handler(new Request('http://localhost/auth/qr/create', { method: 'POST' }))
+      const { sessionId } = await createRes.json()
+
+      const firstScan = await handler(new Request(`http://localhost/auth/qr/${sessionId}/scanned`, { method: 'POST' }))
+      expect(firstScan.status).toBe(200)
+
+      const secondScan = await handler(new Request(`http://localhost/auth/qr/${sessionId}/scanned`, { method: 'POST' }))
+      expect(secondScan.status).toBe(429)
+
+      const completeBody = JSON.stringify({ response: { id: 'cred', response: { clientDataJSON: 'x' } } })
+      const firstComplete = await handler(new Request(`http://localhost/auth/qr/${sessionId}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: completeBody,
+      }))
+      expect(firstComplete.status).toBe(400)
+
+      const secondComplete = await handler(new Request(`http://localhost/auth/qr/${sessionId}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: completeBody,
+      }))
+      expect(secondComplete.status).toBe(429)
+    })
+
     it('handles QR session lifecycle', async () => {
       const auth = makeAuth()
       const handler = auth.createHandler()

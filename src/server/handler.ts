@@ -224,6 +224,7 @@ export function createHandler(
 
       const qrScannedMatch = path.match(/^\/qr\/([^/]+)\/scanned$/)
       if (qrScannedMatch && request.method === 'POST') {
+        await enforceRateLimit('qr.scan', [getClientAddress(request), qrScannedMatch[1]])
         await auth.markQRSessionScanned(qrScannedMatch[1])
         return json({ ok: true })
       }
@@ -241,6 +242,7 @@ export function createHandler(
       const qrCompleteMatch = path.match(/^\/qr\/([^/]+)\/complete$/)
       if (qrCompleteMatch && request.method === 'POST') {
         const body = await readJSON(request)
+        await enforceRateLimit('qr.complete', [getClientAddress(request), qrCompleteMatch[1]])
         const result = await auth.completeQRSession({
           sessionId: qrCompleteMatch[1],
           response: expectObject<AuthenticationResponseJSON>(body, 'response'),

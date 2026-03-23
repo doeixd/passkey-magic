@@ -132,14 +132,16 @@ describe('passkeyMagicPlugin', () => {
           rules: {
             'magicLink.send': { limit: 5, windowMs: 15 * 60 * 1000 },
             'qr.create': { limit: 10, windowMs: 60 * 1000 },
+            'qr.scan': { limit: 8, windowMs: 60 * 1000 },
           },
         },
       })
 
       expect(plugin.rateLimit).toBeDefined()
-      expect(plugin.rateLimit).toHaveLength(2)
+      expect(plugin.rateLimit).toHaveLength(3)
       expect(plugin.rateLimit?.some((rule) => rule.pathMatcher('/passkey-magic/magic-link/send') && rule.max === 5)).toBe(true)
       expect(plugin.rateLimit?.some((rule) => rule.pathMatcher('/passkey-magic/qr/create') && rule.window === 60)).toBe(true)
+      expect(plugin.rateLimit?.some((rule) => rule.pathMatcher('/passkey-magic/qr/scanned') && rule.max === 8)).toBe(true)
     })
   })
 })

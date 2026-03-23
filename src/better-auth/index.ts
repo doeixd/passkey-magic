@@ -38,6 +38,8 @@ const BETTER_AUTH_RATE_LIMIT_PATHS = {
   'magicLink.send': '/passkey-magic/magic-link/send',
   'magicLink.verify': '/passkey-magic/magic-link/verify',
   'qr.create': '/passkey-magic/qr/create',
+  'qr.scan': '/passkey-magic/qr/scanned',
+  'qr.complete': '/passkey-magic/qr/complete',
 } as const
 
 function buildBetterAuthRateLimit(rateLimit?: AuthRateLimitConfig) {
