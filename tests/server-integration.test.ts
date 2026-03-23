@@ -78,6 +78,13 @@ describe('createAuth', () => {
       expect(auth.linkEmail).toBeTypeOf('function')
       expect(auth.unlinkEmail).toBeTypeOf('function')
       expect(auth.deleteAccount).toBeTypeOf('function')
+      expect(auth.accounts.get).toBeTypeOf('function')
+      expect(auth.accounts.getByEmail).toBeTypeOf('function')
+      expect(auth.accounts.isEmailAvailable).toBeTypeOf('function')
+      expect(auth.accounts.canLinkEmail).toBeTypeOf('function')
+      expect(auth.accounts.linkEmail).toBeTypeOf('function')
+      expect(auth.accounts.unlinkEmail).toBeTypeOf('function')
+      expect(auth.accounts.delete).toBeTypeOf('function')
     })
 
     it('has event system', () => {
@@ -179,6 +186,20 @@ describe('createAuth', () => {
       const result = await auth.magicLinks.verify({ token: sentEmails[0].token })
       expect(result.method).toBe('magic-link')
       expect(result.session.authMethod).toBe('magic-link')
+    })
+
+    it('delegates account aliases to base methods', async () => {
+      const auth = makeAuth()
+      await storage.createUser({ id: 'u-accounts', email: 'accounts@example.com', createdAt: new Date() })
+
+      expect((await auth.accounts.get('u-accounts'))?.email).toBe('accounts@example.com')
+      expect((await auth.accounts.getByEmail('accounts@example.com'))?.id).toBe('u-accounts')
+      expect(await auth.accounts.isEmailAvailable('free@example.com')).toBe(true)
+      expect(await auth.accounts.canLinkEmail({ userId: 'u-accounts', email: 'new@example.com' })).toEqual({ ok: true })
+      expect(await auth.accounts.canLinkEmail({ userId: 'u-accounts', email: 'bad-email' })).toEqual({
+        ok: false,
+        reason: 'invalid_email',
+      })
     })
   })
 

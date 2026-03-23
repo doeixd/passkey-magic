@@ -33,6 +33,11 @@ const auth = createAuth({
 export default {
   fetch: auth.createHandler({ pathPrefix: '/auth' })
 }
+
+// Grouped API is the recommended default
+const { userId, options } = await auth.passkeys.register.start({
+  email: 'user@example.com',
+})
 ```
 
 ### Client
@@ -50,10 +55,10 @@ const auth = createClient({
 })
 
 // Register a passkey
-const { user, session } = await auth.registerPasskey({ email: 'user@example.com' })
+const { user, session } = await auth.passkeys.register({ email: 'user@example.com' })
 
 // Sign in
-const result = await auth.signInWithPasskey()
+const result = await auth.passkeys.signIn()
 ```
 
 ## Features
@@ -78,7 +83,7 @@ If a magic link is verified for an email that already belongs to a user, the exi
 
 ### Passkey Authentication
 
-High-level grouped aliases are also available if you prefer intent-based naming:
+The grouped API is the recommended primary surface:
 
 ```ts
 const { userId, options } = await auth.passkeys.register.start({
@@ -94,14 +99,11 @@ const { options: signInOptions } = await auth.passkeys.signIn.start()
 const signIn = await auth.passkeys.signIn.finish({ response: browserResponse })
 ```
 
+The low-level WebAuthn methods are still available for advanced integrations:
+
 ```ts
-// Server: generate options, verify response
 const { options, userId } = await auth.generateRegistrationOptions({ email: 'user@example.com' })
 const result = await auth.verifyRegistration({ userId, response: browserResponse })
-
-// Authentication
-const { options } = await auth.generateAuthenticationOptions()
-const { user, session } = await auth.verifyAuthentication({ response: browserResponse })
 ```
 
 ### QR Cross-Device Login
@@ -112,22 +114,20 @@ Polling stops automatically once the session reaches `authenticated`, `expired`,
 
 ```ts
 // Desktop: create session and display QR code
-const { sessionId } = await auth.createQRSession()
-const sameSession = await auth.qr.create()
-const qrSvg = client.renderQR(`https://example.com/auth/qr/${sessionId}`)
+const { sessionId } = await auth.qr.create()
+const qrSvg = auth.qr.render(`https://example.com/auth/qr/${sessionId}`)
 
 // Desktop: poll for completion
-for await (const status of client.pollQRSession(sessionId)) {
+for await (const status of auth.qr.poll(sessionId)) {
   if (status.state === 'authenticated') {
     // User logged in from their phone
   }
 }
 
 // Mobile: complete the session
-await client.completeQRSession({ sessionId })
+await auth.qr.complete({ sessionId })
 
 // Optional: cancel an in-flight QR login
-await client.cancelQRSession(sessionId)
 await auth.qr.cancel(sessionId)
 ```
 
@@ -148,25 +148,41 @@ const auth = createAuth({
 })
 
 // Send a magic link
-await auth.sendMagicLink({ email: 'user@example.com' })
-await auth.magicLinks.send({ email: 'user@example.com' })
+await auth.magicLinks.request({ email: 'user@example.com' })
 
 // Verify (after user clicks the link)
-const { user, session, isNewUser } = await auth.verifyMagicLink({ token })
-const sameResult = await auth.magicLinks.verify({ token })
+const { user, session, isNewUser } = await auth.magicLinks.verify({ token })
 ```
 
 ### Passkey Management
 
 ```ts
 // Add a passkey to an existing account
-const { options } = await auth.addPasskey({ userId })
-const { credential } = await auth.verifyAddPasskey({ userId, response: browserResponse })
+const { options } = await auth.passkeys.add.start({ userId })
+const { credential } = await auth.passkeys.add.finish({ userId, response: browserResponse })
 
 // List, update, remove
-const credentials = await auth.getUserCredentials(userId)
-await auth.updateCredential({ credentialId: 'cred_123', label: 'iPhone' })
-await auth.removeCredential('cred_123')
+const credentials = await auth.passkeys.list(userId)
+await auth.passkeys.update({ credentialId: 'cred_123', label: 'iPhone' })
+await auth.passkeys.remove('cred_123')
+```
+
+### Accounts And Identity
+
+```ts
+const user = await auth.accounts.get(userId)
+const sameUser = await auth.accounts.getByEmail('user@example.com')
+
+const canLink = await auth.accounts.canLinkEmail({
+  userId,
+  email: 'user@example.com',
+})
+
+if (canLink.ok) {
+  await auth.accounts.linkEmail({ userId, email: 'user@example.com' })
+}
+
+await auth.accounts.unlinkEmail({ userId })
 ```
 
 ### Session Management

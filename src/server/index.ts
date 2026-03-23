@@ -64,6 +64,16 @@ export interface MagicLinkNamespace {
   verify(params: { token: string }): Promise<AuthResult & { method: 'magic-link' }>
 }
 
+export interface AccountNamespace {
+  get(userId: string): Promise<User | null>
+  getByEmail(email: string): Promise<User | null>
+  isEmailAvailable(email: string): Promise<boolean>
+  canLinkEmail(params: { userId: string; email: string }): Promise<{ ok: boolean; reason?: 'invalid_email' | 'email_in_use' }>
+  linkEmail(params: { userId: string; email: string }): Promise<{ user: User }>
+  unlinkEmail(params: { userId: string }): Promise<{ user: User }>
+  delete(userId: string): Promise<void>
+}
+
 // ── Base methods (always available) ──
 
 /** Methods available on every `createAuth()` instance regardless of config. */
@@ -73,6 +83,9 @@ export interface BaseAuthMethods {
 
   /** High-level QR namespace. */
   qr: QRNamespace
+
+  /** High-level account and identity namespace. */
+  accounts: AccountNamespace
 
   // ── Passkey Registration ──
 
@@ -294,6 +307,7 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
   const base: BaseAuthMethods = {
     passkeys: undefined as unknown as PasskeyNamespace,
     qr: undefined as unknown as QRNamespace,
+    accounts: undefined as unknown as AccountNamespace,
 
     // ── Passkey Registration ──
     async generateRegistrationOptions(params) {
@@ -559,6 +573,28 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
     markScanned: (sessionId) => base.markQRSessionScanned(sessionId),
     complete: (params) => base.completeQRSession(params),
     cancel: (sessionId) => base.cancelQRSession(sessionId),
+  }
+
+  base.accounts = {
+    get: (userId) => base.getUser(userId),
+    getByEmail: async (email) => {
+      if (!isValidEmail(email)) return null
+      return config.storage.getUserByEmail(email)
+    },
+    isEmailAvailable: (email) => base.isEmailAvailable(email),
+    async canLinkEmail({ userId, email }) {
+      if (!isValidEmail(email)) {
+        return { ok: false, reason: 'invalid_email' as const }
+      }
+      const existing = await config.storage.getUserByEmail(email)
+      if (existing && existing.id !== userId) {
+        return { ok: false, reason: 'email_in_use' as const }
+      }
+      return { ok: true }
+    },
+    linkEmail: (params) => base.linkEmail(params),
+    unlinkEmail: (params) => base.unlinkEmail(params),
+    delete: (userId) => base.deleteAccount(userId),
   }
 
   // ── Magic Link (conditional) ──
