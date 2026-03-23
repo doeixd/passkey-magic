@@ -246,6 +246,16 @@ await auth.passkeys.update({
 })
 ```
 
+The better-auth plugin also accepts the same metadata generics:
+
+```ts
+const plugin = passkeyMagicPlugin<UserMeta, CredentialMeta>({
+  rpName: 'My App',
+  rpID: 'example.com',
+  origin: 'https://example.com',
+})
+```
+
 ### Session Management
 
 ```ts

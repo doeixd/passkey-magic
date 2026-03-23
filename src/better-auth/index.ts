@@ -9,7 +9,10 @@ import * as z from 'zod'
 
 // ── Types ──
 
-export interface PasskeyMagicPluginOptions {
+export interface PasskeyMagicPluginOptions<
+  TUserMetadata extends MetadataObject = MetadataObject,
+  TCredentialMetadata extends MetadataObject = MetadataObject,
+> {
   rpName: string
   rpID: string
   origin: string | string[]
@@ -18,9 +21,14 @@ export interface PasskeyMagicPluginOptions {
   challengeTTL?: number
   magicLinkTTL?: number
   qrSessionTTL?: number
+  mapUserMetadata?: (userRow: Record<string, unknown>) => TUserMetadata | undefined
+  mapCredentialMetadata?: (value: unknown) => TCredentialMetadata | undefined
 }
 
-type AuthInstance = ReturnType<typeof createAuth>
+type AuthInstance<
+  TUserMetadata extends MetadataObject = MetadataObject,
+  TCredentialMetadata extends MetadataObject = MetadataObject,
+> = ReturnType<typeof createAuth<TUserMetadata, TCredentialMetadata>>
 
 // ── Schema ──
 
@@ -124,7 +132,13 @@ interface BetterAuthAdapter {
   }) => Promise<number>
 }
 
-function createBridgedStorage(adapter: BetterAuthAdapter): StorageAdapter {
+function createBridgedStorage<
+  TUserMetadata extends MetadataObject = MetadataObject,
+  TCredentialMetadata extends MetadataObject = MetadataObject,
+>(
+  adapter: BetterAuthAdapter,
+  options: Pick<PasskeyMagicPluginOptions<TUserMetadata, TCredentialMetadata>, 'mapUserMetadata' | 'mapCredentialMetadata'> = {},
+): StorageAdapter<TUserMetadata, TCredentialMetadata> {
   // In-memory session store — passkey-magic creates its own sessions internally,
   // but we discard them and create proper better-auth sessions in the endpoint handlers.
   // Storing passkey-magic sessions in-memory avoids polluting better-auth's session table
@@ -137,17 +151,17 @@ function createBridgedStorage(adapter: BetterAuthAdapter): StorageAdapter {
     return metadata ? JSON.stringify(metadata) : null
   }
 
-  function deserializeMetadata(value: unknown): MetadataObject | undefined {
+  function deserializeMetadata<TMetadata extends MetadataObject = MetadataObject>(value: unknown): TMetadata | undefined {
     if (!value) return undefined
     if (typeof value === 'string') {
       try {
-        return JSON.parse(value) as MetadataObject
+        return JSON.parse(value) as TMetadata
       } catch {
         return undefined
       }
     }
     if (typeof value === 'object' && !Array.isArray(value)) {
-      return value as MetadataObject
+      return value as TMetadata
     }
     return undefined
   }
@@ -181,7 +195,7 @@ function createBridgedStorage(adapter: BetterAuthAdapter): StorageAdapter {
           id: row.id,
           email: row.email ?? undefined,
           createdAt: new Date(row.createdAt),
-          metadata: deserializeMetadata(row.metadata),
+          metadata: options.mapUserMetadata?.(row) ?? deserializeMetadata<TUserMetadata>(row.metadata),
         }
       } catch {
         return null
@@ -198,7 +212,7 @@ function createBridgedStorage(adapter: BetterAuthAdapter): StorageAdapter {
           id: row.id,
           email: row.email ?? undefined,
           createdAt: new Date(row.createdAt),
-          metadata: deserializeMetadata(row.metadata),
+          metadata: options.mapUserMetadata?.(row) ?? deserializeMetadata<TUserMetadata>(row.metadata),
         }
       } catch {
         return null
@@ -218,7 +232,7 @@ function createBridgedStorage(adapter: BetterAuthAdapter): StorageAdapter {
         id: row.id,
         email: row.email ?? undefined,
         createdAt: new Date(row.createdAt),
-        metadata: deserializeMetadata(row.metadata),
+        metadata: options.mapUserMetadata?.(row) ?? deserializeMetadata<TUserMetadata>(row.metadata),
       }
     },
     async deleteUser(id) {
@@ -252,7 +266,7 @@ function createBridgedStorage(adapter: BetterAuthAdapter): StorageAdapter {
           where: [{ field: 'id', value: id }],
         })
         if (!row) return null
-        return rowToCredential(row)
+        return rowToCredential<TCredentialMetadata>(row, options.mapCredentialMetadata)
       } catch {
         return null
       }
@@ -263,7 +277,7 @@ function createBridgedStorage(adapter: BetterAuthAdapter): StorageAdapter {
           model: 'passkeyCredential',
           where: [{ field: 'userId', value: userId }],
         })
-        return rows.map(rowToCredential)
+        return rows.map((row) => rowToCredential<TCredentialMetadata>(row, options.mapCredentialMetadata))
       } catch {
         // Table may not exist yet (e.g. memory adapter before first write)
         return []
@@ -452,7 +466,10 @@ function createBridgedStorage(adapter: BetterAuthAdapter): StorageAdapter {
   }
 }
 
-function rowToCredential(row: any): Credential {
+function rowToCredential<TCredentialMetadata extends MetadataObject = MetadataObject>(
+  row: any,
+  mapCredentialMetadata?: (value: unknown) => TCredentialMetadata | undefined,
+): Credential<TCredentialMetadata> {
   return {
     id: row.id,
     userId: row.userId,
@@ -462,7 +479,7 @@ function rowToCredential(row: any): Credential {
     backedUp: row.backedUp,
     transports: row.transports ? JSON.parse(row.transports) : undefined,
     label: row.label ?? undefined,
-    metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
+    metadata: mapCredentialMetadata?.(row.metadata) ?? (row.metadata ? JSON.parse(row.metadata) : undefined),
     createdAt: new Date(row.createdAt),
   }
 }
@@ -505,13 +522,16 @@ async function ensureBetterAuthUser(
 
 // ── Plugin ──
 
-export function passkeyMagicPlugin(options: PasskeyMagicPluginOptions) {
-  let _auth: AuthInstance | null = null
+export function passkeyMagicPlugin<
+  TUserMetadata extends MetadataObject = MetadataObject,
+  TCredentialMetadata extends MetadataObject = MetadataObject,
+>(options: PasskeyMagicPluginOptions<TUserMetadata, TCredentialMetadata>) {
+  let _auth: AuthInstance<TUserMetadata, TCredentialMetadata> | null = null
 
-  function getAuth(ctx: any): AuthInstance {
+  function getAuth(ctx: any): AuthInstance<TUserMetadata, TCredentialMetadata> {
     if (!_auth) {
-      const storage = createBridgedStorage(ctx.context.adapter)
-      _auth = createAuth({
+      const storage = createBridgedStorage<TUserMetadata, TCredentialMetadata>(ctx.context.adapter, options)
+      _auth = createAuth<TUserMetadata, TCredentialMetadata>({
         rpName: options.rpName,
         rpID: options.rpID,
         origin: options.origin,
@@ -691,7 +711,7 @@ export function passkeyMagicPlugin(options: PasskeyMagicPluginOptions) {
           await auth.updateCredential({
             credentialId: ctx.body.credentialId,
             label: ctx.body.label,
-            metadata: ctx.body.metadata,
+            metadata: ctx.body.metadata as TCredentialMetadata | undefined,
           })
           return ctx.json({ success: true })
         },
@@ -711,7 +731,7 @@ export function passkeyMagicPlugin(options: PasskeyMagicPluginOptions) {
           const userId = ctx.context.session.user.id
           const result = await auth.updateUserMetadata({
             userId,
-            metadata: ctx.body.metadata,
+            metadata: ctx.body.metadata as TUserMetadata | undefined,
           })
           return ctx.json(result)
         },

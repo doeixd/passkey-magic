@@ -6,7 +6,7 @@ import type {
   AuthenticationResponseJSON,
   RegistrationResponseJSON,
 } from '@simplewebauthn/server'
-import type { Credential, User } from '../types.js'
+import type { Credential, MetadataObject, User } from '../types.js'
 
 interface BetterAuthFetch {
   <T = unknown>(path: string, options?: {
@@ -16,10 +16,13 @@ interface BetterAuthFetch {
   }): Promise<T>
 }
 
-export const passkeyMagicClientPlugin = () =>
+export const passkeyMagicClientPlugin = <
+  TUserMetadata extends MetadataObject = MetadataObject,
+  TCredentialMetadata extends MetadataObject = MetadataObject,
+>() =>
   ({
     id: 'passkey-magic',
-    $InferServerPlugin: {} as ReturnType<typeof passkeyMagicPlugin>,
+    $InferServerPlugin: {} as ReturnType<typeof passkeyMagicPlugin<TUserMetadata, TCredentialMetadata>>,
     getActions: ($fetch: BetterAuthFetch) => ({
       passkeyMagic: {
         register: {
@@ -43,7 +46,7 @@ export const passkeyMagicClientPlugin = () =>
           },
           list: () =>
             $fetch('/passkey-magic/credentials', { method: 'GET' }),
-          update: (body: { credentialId: string; label?: string; metadata?: Credential['metadata'] }) =>
+          update: (body: { credentialId: string; label?: string; metadata?: Credential<TCredentialMetadata>['metadata'] }) =>
             $fetch('/passkey-magic/credentials/update', { method: 'POST', body }),
           remove: (body: { credentialId: string }) =>
             $fetch('/passkey-magic/credentials/remove', { method: 'POST', body }),
@@ -67,7 +70,7 @@ export const passkeyMagicClientPlugin = () =>
         accounts: {
           canLinkEmail: (body: { email: string }) =>
             $fetch('/passkey-magic/account/can-link-email', { method: 'POST', body }),
-          updateMetadata: (body: { metadata?: User['metadata'] }) =>
+          updateMetadata: (body: { metadata?: User<TUserMetadata>['metadata'] }) =>
             $fetch('/passkey-magic/account/update', { method: 'POST', body }),
         },
       },

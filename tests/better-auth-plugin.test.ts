@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, expectTypeOf, vi, beforeEach } from 'vitest'
 import { passkeyMagicPlugin } from '../src/better-auth/index.js'
 import { passkeyMagicClientPlugin } from '../src/better-auth/client.js'
 
@@ -176,5 +176,22 @@ describe('passkeyMagicClientPlugin', () => {
     expect(client.pathMethods).toEqual({
       '/passkey-magic/qr/status': 'GET',
     })
+  })
+
+  it('carries metadata generics through better-auth client plugin actions', () => {
+    type UserMeta = { theme: 'dark' | 'light' }
+    type CredentialMeta = { nickname: string }
+
+    const client = passkeyMagicClientPlugin<UserMeta, CredentialMeta>()
+    const actions = client.getActions?.((async () => ({})) as any)
+
+    expectTypeOf(actions?.passkeyMagic.accounts.updateMetadata).parameter(0).toEqualTypeOf<{
+      metadata?: UserMeta
+    }>()
+    expectTypeOf(actions?.passkeyMagic.passkeys.update).parameter(0).toEqualTypeOf<{
+      credentialId: string
+      label?: string
+      metadata?: CredentialMeta
+    }>()
   })
 })
