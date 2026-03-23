@@ -4,6 +4,7 @@ import type {
   AuthEventMap,
   AuthResult,
   Credential,
+  EmailLinkability,
   EmailAdapter,
   MagicLinkMethods,
   QRSessionStatus,
@@ -68,7 +69,7 @@ export interface AccountNamespace {
   get(userId: string): Promise<User | null>
   getByEmail(email: string): Promise<User | null>
   isEmailAvailable(email: string): Promise<boolean>
-  canLinkEmail(params: { userId: string; email: string }): Promise<{ ok: boolean; reason?: 'invalid_email' | 'email_in_use' }>
+  canLinkEmail(params: { userId: string; email: string }): Promise<EmailLinkability>
   linkEmail(params: { userId: string; email: string }): Promise<{ user: User }>
   unlinkEmail(params: { userId: string }): Promise<{ user: User }>
   delete(userId: string): Promise<void>

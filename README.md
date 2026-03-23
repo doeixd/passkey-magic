@@ -185,6 +185,17 @@ if (canLink.ok) {
 await auth.accounts.unlinkEmail({ userId })
 ```
 
+On the client, the same account workflow is available for the current authenticated user:
+
+```ts
+const profile = await auth.accounts.get()
+const canLink = await auth.accounts.canLinkEmail('user@example.com')
+
+if (canLink.ok) {
+  await auth.accounts.linkEmail('user@example.com')
+}
+```
+
 ### Session Management
 
 ```ts

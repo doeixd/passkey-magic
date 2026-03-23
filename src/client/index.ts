@@ -1,4 +1,4 @@
-import type { ClientConfig, Credential, QRSessionStatus, Session, User } from '../types.js'
+import type { ClientConfig, Credential, EmailLinkability, QRSessionStatus, Session, User } from '../types.js'
 import { createClientPasskeyManager } from './passkey.js'
 import { createClientQRManager } from './qr.js'
 import { createClientMagicLinkManager } from './magic-link.js'
@@ -43,6 +43,15 @@ export interface PasskeyMagicClient {
       session: { token: string; expiresAt: string; authMethod: 'magic-link'; authContext?: { qrSessionId?: string } }
       isNewUser: boolean
     }>
+  }
+
+  accounts: {
+    get(): Promise<{ user: User }>
+    isEmailAvailable(email: string): Promise<boolean>
+    canLinkEmail(email: string): Promise<EmailLinkability>
+    linkEmail(email: string): Promise<{ user: User }>
+    unlinkEmail(): Promise<{ user: User }>
+    delete(): Promise<void>
   }
 
   // ── Passkey ──
@@ -203,6 +212,29 @@ export function createClient(config: ClientConfig): PasskeyMagicClient {
     magicLinks: {
       request: (params) => magicLink.send(params),
       verify: (params) => magicLink.verify(params),
+    },
+    accounts: {
+      get: () => config.request('/account'),
+      async isEmailAvailable(email) {
+        const result = await config.request<{ available: boolean }>('/account/email-available', { email })
+        return result.available
+      },
+      async canLinkEmail(email) {
+        const account = await config.request<{ user: User }>('/account')
+        if (!/^\S+@\S+\.\S+$/.test(email)) {
+          return { ok: false, reason: 'invalid_email' }
+        }
+        if (account.user.email === email) {
+          return { ok: true }
+        }
+        const available = await client.accounts.isEmailAvailable(email)
+        return available ? { ok: true } : { ok: false, reason: 'email_in_use' }
+      },
+      linkEmail: (email) => config.request('/account/link-email', { email }),
+      unlinkEmail: () => config.request('/account/unlink-email', {}),
+      async delete() {
+        await config.request('/account/delete', {})
+      },
     },
 
     // Passkey

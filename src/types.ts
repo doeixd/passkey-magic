@@ -68,6 +68,11 @@ export type AuthResult =
   | { method: 'magic-link'; user: User; session: Session; isNewUser: boolean }
   | { method: 'qr'; user: User; session: Session }
 
+/** Result of checking whether an email can be linked to a user. */
+export type EmailLinkability =
+  | { ok: true }
+  | { ok: false; reason: 'invalid_email' | 'email_in_use' }
+
 // ── Storage Adapter ──
 
 /**
