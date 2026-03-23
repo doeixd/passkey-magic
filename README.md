@@ -58,6 +58,24 @@ const result = await auth.signInWithPasskey()
 
 ## Features
 
+## Identity Model
+
+`passkey-magic` treats `User` as the canonical account record.
+
+- Passkey registration can create a user without an email.
+- Magic link verification can create a user with an email.
+- Email is optional overall and can be linked later with `linkEmail()`.
+- Signing in never merges accounts implicitly.
+- QR completion authenticates an existing mobile user into a desktop session; it does not create a new identity on its own.
+
+That means the library supports three common shapes cleanly:
+
+- passkey-only accounts
+- email-only accounts created through magic links
+- accounts that start with one method and attach the other later
+
+If a magic link is verified for an email that already belongs to a user, the existing user is signed in. If an email is already linked to a different user, `linkEmail()` fails instead of merging accounts.
+
 ### Passkey Authentication
 
 ```ts
@@ -71,6 +89,10 @@ const { user, session } = await auth.verifyAuthentication({ response: browserRes
 ```
 
 ### QR Cross-Device Login
+
+QR login is modeled as a short-lived state machine. Sessions move through `created`, `scanned`, `challenged`, `authenticated`, `expired`, or `cancelled`.
+
+Polling stops automatically once the session reaches `authenticated`, `expired`, or `cancelled`.
 
 ```ts
 // Desktop: create session and display QR code
@@ -86,6 +108,9 @@ for await (const status of client.pollQRSession(sessionId)) {
 
 // Mobile: complete the session
 await client.completeQRSession({ sessionId })
+
+// Optional: cancel an in-flight QR login
+await client.cancelQRSession(sessionId)
 ```
 
 ### Magic Links
@@ -128,6 +153,11 @@ await auth.removeCredential('cred_123')
 
 ```ts
 const result = await auth.validateSession(token)  // { user, session } | null
+
+if (result) {
+  result.session.authMethod // 'passkey' | 'magic-link' | 'qr'
+}
+
 const sessions = await auth.getUserSessions(userId)
 await auth.revokeSession(token)
 await auth.revokeAllSessions(userId)
