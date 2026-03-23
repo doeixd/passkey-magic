@@ -39,6 +39,7 @@ const BETTER_AUTH_RATE_LIMIT_PATHS = {
   'magicLink.verify': '/passkey-magic/magic-link/verify',
   'qr.create': '/passkey-magic/qr/create',
   'qr.scan': '/passkey-magic/qr/scanned',
+  'qr.confirm': '/passkey-magic/qr/confirm',
   'qr.complete': '/passkey-magic/qr/complete',
 } as const
 
@@ -86,10 +87,12 @@ const qrSessionSchema = {
   fields: {
     state: { type: 'string' as const, required: true },
     statusToken: { type: 'string' as const, required: true },
+    confirmationCode: { type: 'string' as const, required: false },
     userId: { type: 'string' as const, required: false },
     sessionToken: { type: 'string' as const, required: false },
     expiresAt: { type: 'date' as const, required: true },
     createdAt: { type: 'date' as const, required: true },
+    confirmedAt: { type: 'date' as const, required: false },
     scannedAt: { type: 'date' as const, required: false },
     challengedAt: { type: 'date' as const, required: false },
     authenticatedAt: { type: 'date' as const, required: false },
@@ -451,10 +454,12 @@ function createBridgedStorage<
           id: session.id,
           state: session.state,
           statusToken: session.statusToken,
+          confirmationCode: session.confirmationCode ?? null,
           userId: session.userId ?? null,
           sessionToken: session.sessionToken ?? null,
           expiresAt: session.expiresAt,
           createdAt: session.createdAt,
+          confirmedAt: session.confirmedAt ?? null,
           scannedAt: session.scannedAt ?? null,
           challengedAt: session.challengedAt ?? null,
           authenticatedAt: session.authenticatedAt ?? null,
@@ -475,10 +480,12 @@ function createBridgedStorage<
           id: row.id,
           state: row.state,
           statusToken: row.statusToken,
+          confirmationCode: row.confirmationCode ?? undefined,
           userId: row.userId ?? undefined,
           sessionToken: row.sessionToken ?? undefined,
           expiresAt: new Date(row.expiresAt),
           createdAt: new Date(row.createdAt),
+          confirmedAt: row.confirmedAt ? new Date(row.confirmedAt) : undefined,
           scannedAt: row.scannedAt ? new Date(row.scannedAt) : undefined,
           challengedAt: row.challengedAt ? new Date(row.challengedAt) : undefined,
           authenticatedAt: row.authenticatedAt ? new Date(row.authenticatedAt) : undefined,
@@ -850,6 +857,25 @@ export function passkeyMagicPlugin<
         async (ctx) => {
           const auth = getAuth(ctx)
           await auth.markQRSessionScanned(ctx.body.sessionId)
+          return ctx.json({ success: true })
+        },
+      ),
+
+      passkeyMagicQrConfirm: createAuthEndpoint(
+        '/passkey-magic/qr/confirm',
+        {
+          method: 'POST',
+          body: z.object({
+            sessionId: z.string(),
+            confirmationCode: z.string(),
+          }),
+        },
+        async (ctx) => {
+          const auth = getAuth(ctx)
+          await auth.confirmQRSession({
+            sessionId: ctx.body.sessionId,
+            confirmationCode: ctx.body.confirmationCode,
+          })
           return ctx.json({ success: true })
         },
       ),

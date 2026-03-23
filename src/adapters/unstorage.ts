@@ -72,8 +72,10 @@ export function unstorageAdapter<
     if (!raw) return null
     return {
       ...raw,
+      confirmationCode: raw.confirmationCode as string | undefined,
       expiresAt: new Date(raw.expiresAt as string),
       createdAt: new Date(raw.createdAt as string),
+      confirmedAt: raw.confirmedAt ? new Date(raw.confirmedAt as string) : undefined,
       scannedAt: raw.scannedAt ? new Date(raw.scannedAt as string) : undefined,
       challengedAt: raw.challengedAt ? new Date(raw.challengedAt as string) : undefined,
       authenticatedAt: raw.authenticatedAt ? new Date(raw.authenticatedAt as string) : undefined,

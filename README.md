@@ -126,11 +126,23 @@ Security model:
 - Possession of `sessionId` alone does not reveal desktop status, but it does allow a scanner to attempt authentication into that desktop flow.
 - In other words, whoever scans the QR first can try to complete login on the desktop if they can also satisfy mobile authentication.
 
+For stronger protection, you can enable an optional short confirmation code:
+
+```ts
+const auth = createAuth({
+  // ...other config
+  qrConfirmation: {
+    enabled: true,
+    codeLength: 6,
+  },
+})
+```
+
 This is acceptable for many QR login designs, but it is not equivalent to strong desktop/mobile device binding. If you need stronger protection against QR capture or confused-deputy style flow hijacking, add a desktop confirmation step or short approval code in your application UX.
 
 ```ts
 // Desktop: create session and display QR code
-const { sessionId, statusToken } = await auth.qr.create()
+const { sessionId, statusToken, confirmationCode } = await auth.qr.create()
 const qrSvg = auth.qr.render(`https://example.com/auth/qr/${sessionId}`)
 
 // Desktop: poll for completion
@@ -141,7 +153,7 @@ for await (const status of auth.qr.poll(sessionId, statusToken)) {
 }
 
 // Mobile: complete the session
-await auth.qr.complete({ sessionId })
+await auth.qr.complete({ sessionId, confirmationCode })
 
 // Optional: cancel an in-flight QR login
 await auth.qr.cancel({ sessionId, statusToken })

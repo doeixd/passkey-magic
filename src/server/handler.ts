@@ -39,6 +39,7 @@ const MAX_EMAIL_LENGTH = 254
  * POST /qr/create                    — Create QR login session
  * GET  /qr/:id/status                — Poll QR session status
  * POST /qr/:id/scanned              — Mark QR session scanned
+ * POST /qr/:id/confirm              — Confirm QR session short code
  * POST /qr/:id/complete             — Complete QR session
  * GET  /session                      — Validate current session (Bearer token)
  * DELETE /session                    — Revoke current session (Bearer token)
@@ -235,6 +236,17 @@ export function createHandler(
         await auth.cancelQRSession({
           sessionId: qrCancelMatch[1],
           statusToken: expectTokenString(body, 'statusToken'),
+        })
+        return json({ ok: true })
+      }
+
+      const qrConfirmMatch = path.match(/^\/qr\/([^/]+)\/confirm$/)
+      if (qrConfirmMatch && request.method === 'POST') {
+        const body = await readJSON(request)
+        await enforceRateLimit('qr.confirm', [getClientAddress(request), qrConfirmMatch[1]])
+        await auth.confirmQRSession({
+          sessionId: qrConfirmMatch[1],
+          confirmationCode: expectString(body, 'confirmationCode'),
         })
         return json({ ok: true })
       }

@@ -15,6 +15,7 @@ const DEFAULT_RATE_LIMIT_RULES: Record<RateLimitRoute, RateLimitRule> = {
   'magicLink.verify': { limit: 10, windowMs: 15 * 60 * 1000 },
   'qr.create': { limit: 20, windowMs: 5 * 60 * 1000 },
   'qr.scan': { limit: 30, windowMs: 5 * 60 * 1000 },
+  'qr.confirm': { limit: 15, windowMs: 5 * 60 * 1000 },
   'qr.complete': { limit: 15, windowMs: 5 * 60 * 1000 },
   'email.available': { limit: 10, windowMs: 60 * 1000 },
 }

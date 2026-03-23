@@ -58,6 +58,8 @@ export const passkeyMagicClientPlugin = <
             $fetch('/passkey-magic/qr/status', { method: 'GET', query: { sessionId, statusToken } }),
           scanned: (body: { sessionId: string }) =>
             $fetch('/passkey-magic/qr/scanned', { method: 'POST', body }),
+          confirm: (body: { sessionId: string; confirmationCode: string }) =>
+            $fetch('/passkey-magic/qr/confirm', { method: 'POST', body }),
           complete: (body: { sessionId: string; response: AuthenticationResponseJSON }) =>
             $fetch('/passkey-magic/qr/complete', { method: 'POST', body }),
         },

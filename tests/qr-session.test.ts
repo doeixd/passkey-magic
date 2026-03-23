@@ -89,4 +89,25 @@ describe('QRSessionManager', () => {
   it('throws for unknown session', async () => {
     await expect(qr.getStatus('nonexistent', 'token')).rejects.toThrow('not found')
   })
+
+  it('requires confirmation before completion when enabled', async () => {
+    const confirmingQr = createQRSessionManager(storage, {
+      ttl: 5 * 60 * 1000,
+      confirmation: { enabled: true, codeLength: 6 },
+    })
+    const { sessionId, statusToken, confirmationCode } = await confirmingQr.create()
+
+    expect(confirmationCode).toMatch(/^\d{6}$/)
+    await confirmingQr.markScanned(sessionId)
+    const status = await confirmingQr.getStatus(sessionId, statusToken)
+    expect(status.confirmationRequired).toBe(true)
+    expect(status.confirmed).toBe(false)
+
+    await expect(confirmingQr.beginChallenge(sessionId)).rejects.toThrow('requires confirmation')
+    await expect(confirmingQr.complete(sessionId, 'user-1', 'token')).rejects.toThrow('requires confirmation')
+
+    await confirmingQr.confirm(sessionId, confirmationCode!)
+    const confirmedStatus = await confirmingQr.getStatus(sessionId, statusToken)
+    expect(confirmedStatus.confirmed).toBe(true)
+  })
 })

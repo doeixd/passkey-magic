@@ -64,11 +64,15 @@ export interface QRNamespace<
    *
    * Keep `statusToken` private to the initiating device and use it for
    * polling or cancellation. The QR code itself should only contain `sessionId`.
+   * If QR confirmation is enabled, `confirmationCode` should be shown on the
+   * desktop and entered or confirmed on the completing device.
    */
-  create(): Promise<{ sessionId: string; statusToken: string }>
+  create(): Promise<{ sessionId: string; statusToken: string; confirmationCode?: string }>
   /** Poll a QR session using the secret desktop `statusToken`. */
   getStatus(params: { sessionId: string; statusToken: string }): Promise<QRSessionStatus>
   markScanned(sessionId: string): Promise<void>
+  /** Confirm a QR session with the desktop-shown code when confirmation is enabled. */
+  confirm(params: { sessionId: string; confirmationCode: string }): Promise<void>
   complete(params: {
     sessionId: string
     response: AuthenticationResponseJSON
@@ -194,13 +198,16 @@ export interface BaseAuthMethods<
    * Encode only `sessionId` into the QR code. Keep `statusToken` on the desktop
    * side and require it for polling/cancellation.
    */
-  createQRSession(): Promise<{ sessionId: string; statusToken: string }>
+  createQRSession(): Promise<{ sessionId: string; statusToken: string; confirmationCode?: string }>
 
   /** Poll the status of a QR session using its desktop-bound status token. */
   getQRSessionStatus(params: { sessionId: string; statusToken: string }): Promise<QRSessionStatus>
 
   /** Mark a QR session as scanned (called from the phone after scanning). */
   markQRSessionScanned(sessionId: string): Promise<void>
+
+  /** Confirm a QR session using the desktop-shown confirmation code when enabled. */
+  confirmQRSession(params: { sessionId: string; confirmationCode: string }): Promise<void>
 
   /** Cancel a QR session before it completes. */
   cancelQRSession(params: { sessionId: string; statusToken: string }): Promise<void>
@@ -351,6 +358,7 @@ export function createAuth<
   const qrSessions = createQRSessionManager(config.storage, {
     ttl: config.qrSessionTTL ?? FIVE_MINUTES,
     generateId: config.generateId,
+    confirmation: config.qrConfirmation,
   })
 
   const base = {
@@ -472,6 +480,10 @@ export function createAuth<
     async markQRSessionScanned(sessionId) {
       await qrSessions.markScanned(sessionId)
       emitter.emit('qr:scanned', { sessionId })
+    },
+
+    async confirmQRSession({ sessionId, confirmationCode }) {
+      await qrSessions.confirm(sessionId, confirmationCode)
     },
 
     async cancelQRSession({ sessionId, statusToken }) {
@@ -632,6 +644,7 @@ export function createAuth<
     create: () => base.createQRSession(),
     getStatus: (params) => base.getQRSessionStatus(params),
     markScanned: (sessionId) => base.markQRSessionScanned(sessionId),
+    confirm: (params) => base.confirmQRSession(params),
     complete: (params) => base.completeQRSession(params),
     cancel: (params) => base.cancelQRSession(params),
   }

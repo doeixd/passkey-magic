@@ -686,6 +686,7 @@ describe('createAuth', () => {
         rateLimit: {
           rules: {
             'qr.scan': { limit: 1, windowMs: 60_000 },
+            'qr.confirm': { limit: 1, windowMs: 60_000 },
             'qr.complete': { limit: 1, windowMs: 60_000 },
           },
         },
@@ -700,6 +701,20 @@ describe('createAuth', () => {
 
       const secondScan = await handler(new Request(`http://localhost/auth/qr/${sessionId}/scanned`, { method: 'POST' }))
       expect(secondScan.status).toBe(429)
+
+      const firstConfirm = await handler(new Request(`http://localhost/auth/qr/${sessionId}/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmationCode: '123456' }),
+      }))
+      expect(firstConfirm.status).toBe(200)
+
+      const secondConfirm = await handler(new Request(`http://localhost/auth/qr/${sessionId}/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmationCode: '123456' }),
+      }))
+      expect(secondConfirm.status).toBe(429)
 
       const completeBody = JSON.stringify({ response: { id: 'cred', response: { clientDataJSON: 'x' } } })
       const firstComplete = await handler(new Request(`http://localhost/auth/qr/${sessionId}/complete`, {
@@ -742,6 +757,30 @@ describe('createAuth', () => {
         headers: { 'Content-Type': 'application/json' },
       }))
       expect(cancelRes.status).toBe(200)
+    })
+
+    it('supports optional QR confirmation flow', async () => {
+      const auth = makeAuth({ qrConfirmation: { enabled: true, codeLength: 6 } })
+      const handler = auth.createHandler()
+
+      const createRes = await handler(new Request('http://localhost/auth/qr/create', { method: 'POST' }))
+      const { sessionId, statusToken, confirmationCode } = await createRes.json()
+      expect(confirmationCode).toMatch(/^\d{6}$/)
+
+      await handler(new Request(`http://localhost/auth/qr/${sessionId}/scanned`, { method: 'POST' }))
+
+      const statusBefore = await handler(new Request(`http://localhost/auth/qr/${sessionId}/status?token=${encodeURIComponent(statusToken)}`))
+      expect((await statusBefore.json()).confirmed).toBe(false)
+
+      const confirmRes = await handler(new Request(`http://localhost/auth/qr/${sessionId}/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmationCode }),
+      }))
+      expect(confirmRes.status).toBe(200)
+
+      const statusAfter = await handler(new Request(`http://localhost/auth/qr/${sessionId}/status?token=${encodeURIComponent(statusToken)}`))
+      expect((await statusAfter.json()).confirmed).toBe(true)
     })
 
     it('rejects QR status polling without the desktop status token', async () => {

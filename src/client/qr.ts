@@ -6,7 +6,7 @@ import type { ClientConfig, QRSessionStatus } from '../types.js'
 
 /** Client-side QR cross-device login manager. */
 export interface ClientQRManager {
-  createSession(): Promise<{ sessionId: string; statusToken: string }>
+  createSession(): Promise<{ sessionId: string; statusToken: string; confirmationCode?: string }>
   renderSVG(url: string, opts?: { border?: number }): string
   renderText(url: string, opts?: { border?: number }): string
   pollSession(
@@ -14,14 +14,15 @@ export interface ClientQRManager {
     statusToken: string,
     opts?: { interval?: number; signal?: AbortSignal },
   ): AsyncIterable<QRSessionStatus>
-  completeSession(params: { sessionId: string }): Promise<void>
+  confirmSession(params: { sessionId: string; confirmationCode: string }): Promise<void>
+  completeSession(params: { sessionId: string; confirmationCode?: string }): Promise<void>
   cancelSession(params: { sessionId: string; statusToken: string }): Promise<void>
 }
 
 export function createClientQRManager(config: ClientConfig): ClientQRManager {
   return {
     async createSession() {
-      return config.request<{ sessionId: string; statusToken: string }>('/qr/create', {})
+      return config.request<{ sessionId: string; statusToken: string; confirmationCode?: string }>('/qr/create', {})
     },
 
     renderSVG(url, opts) {
@@ -58,8 +59,16 @@ export function createClientQRManager(config: ClientConfig): ClientQRManager {
       }
     },
 
-    async completeSession({ sessionId }) {
+    async confirmSession({ sessionId, confirmationCode }) {
+      await config.request(`/qr/${sessionId}/confirm`, { confirmationCode })
+    },
+
+    async completeSession({ sessionId, confirmationCode }) {
       await config.request(`/qr/${sessionId}/scanned`, {})
+
+      if (confirmationCode) {
+        await config.request(`/qr/${sessionId}/confirm`, { confirmationCode })
+      }
 
       const { startAuthentication } = await import('@simplewebauthn/browser')
       const { options } = await config.request<{

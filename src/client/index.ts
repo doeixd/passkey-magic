@@ -33,12 +33,14 @@ export interface PasskeyMagicClient<
 
   qr: {
     /** Create a desktop QR session and keep `statusToken` private for polling/cancellation. */
-    create(): Promise<{ sessionId: string; statusToken: string }>
+    create(): Promise<{ sessionId: string; statusToken: string; confirmationCode?: string }>
     render(url: string, opts?: { border?: number }): string
     renderText(url: string, opts?: { border?: number }): string
     /** Poll QR status with the desktop-only `statusToken`. */
     poll(sessionId: string, statusToken: string, opts?: { interval?: number; signal?: AbortSignal }): AsyncIterable<QRSessionStatus>
-    complete(params: { sessionId: string }): Promise<void>
+    /** Confirm a QR session using the desktop-shown short code when enabled. */
+    confirm(params: { sessionId: string; confirmationCode: string }): Promise<void>
+    complete(params: { sessionId: string; confirmationCode?: string }): Promise<void>
     cancel(params: { sessionId: string; statusToken: string }): Promise<void>
   }
 
@@ -106,7 +108,7 @@ export interface PasskeyMagicClient<
   // ── QR Cross-Device ──
 
   /** Create a new QR login session on the server. Keep `statusToken` private on the desktop. */
-  createQRSession(): Promise<{ sessionId: string; statusToken: string }>
+  createQRSession(): Promise<{ sessionId: string; statusToken: string; confirmationCode?: string }>
   /** Render a URL as an SVG QR code using uqr. */
   renderQR(url: string, opts?: { border?: number }): string
   /** Render a URL as a text QR code using uqr. */
@@ -122,7 +124,8 @@ export interface PasskeyMagicClient<
     opts?: { interval?: number; signal?: AbortSignal },
   ): AsyncIterable<QRSessionStatus>
   /** Complete a QR session from the scanning device (authenticates with passkey). */
-  completeQRSession(params: { sessionId: string }): Promise<void>
+  confirmQRSession(params: { sessionId: string; confirmationCode: string }): Promise<void>
+  completeQRSession(params: { sessionId: string; confirmationCode?: string }): Promise<void>
   /** Cancel a QR session before it completes. */
   cancelQRSession(params: { sessionId: string; statusToken: string }): Promise<void>
 
@@ -221,6 +224,7 @@ export function createClient<
       render: (url, opts) => qr.renderSVG(url, opts),
       renderText: (url, opts) => qr.renderText(url, opts),
       poll: (id, statusToken, opts) => qr.pollSession(id, statusToken, opts),
+      confirm: (params) => qr.confirmSession(params),
       complete: (params) => qr.completeSession(params),
       cancel: (params) => qr.cancelSession(params),
     },
@@ -272,6 +276,7 @@ export function createClient<
     renderQR: (url, opts) => qr.renderSVG(url, opts),
     renderQRText: (url, opts) => qr.renderText(url, opts),
     pollQRSession: (id, statusToken, opts) => qr.pollSession(id, statusToken, opts),
+    confirmQRSession: (params) => qr.confirmSession(params),
     completeQRSession: (params) => qr.completeSession(params),
     cancelQRSession: (params) => qr.cancelSession(params),
 

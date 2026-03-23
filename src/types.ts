@@ -63,6 +63,8 @@ export interface QRSession {
   id: string
   state: 'created' | 'scanned' | 'challenged' | 'authenticated' | 'expired' | 'cancelled'
   statusToken: string
+  confirmationCode?: string
+  confirmedAt?: Date
   userId?: string
   sessionToken?: string
   expiresAt: Date
@@ -201,6 +203,7 @@ export type RateLimitRoute =
   | 'magicLink.verify'
   | 'qr.create'
   | 'qr.scan'
+  | 'qr.confirm'
   | 'qr.complete'
   | 'email.available'
 
@@ -237,6 +240,13 @@ export interface AuthRateLimitConfig {
   rules?: Partial<Record<RateLimitRoute, RateLimitRule | null>>
 }
 
+export interface QRConfirmationConfig {
+  /** Enable short-code confirmation before QR completion. */
+  enabled?: boolean
+  /** Length of numeric confirmation code. Default: 6. */
+  codeLength?: number
+}
+
 // ── Config ──
 
 /** Configuration for `createAuth()`. */
@@ -261,6 +271,8 @@ export interface AuthConfig<TEmail extends EmailAdapter | undefined = undefined>
   magicLinkTTL?: number
   /** QR session TTL in ms. Default: 5 minutes. */
   qrSessionTTL?: number
+  /** Optional QR confirmation-code requirement for mobile completion. */
+  qrConfirmation?: QRConfirmationConfig
   /** Custom ID generator. Default: `crypto.randomUUID()`. */
   generateId?: () => string
   /** Lifecycle hooks. */
@@ -292,6 +304,8 @@ export interface ClientConfig {
 /** Status of a QR cross-device login session. */
 export interface QRSessionStatus {
   state: QRSession['state']
+  confirmationRequired?: boolean
+  confirmed?: boolean
   session?: { token: string; expiresAt: string }
 }
 
