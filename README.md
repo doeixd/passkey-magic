@@ -14,6 +14,8 @@ Passkey-first authentication with QR cross-device login and magic link fallback.
 npm install passkey-magic
 ```
 
+For production deployment guidance, see `SECURITY.md` and `RELEASE.md`.
+
 ## Quick Start
 
 ### Server
@@ -308,6 +310,26 @@ const prodAuth = createAuth({
 ```
 
 If you use the better-auth plugin, you can pass the same `rateLimit` config there too.
+
+## Production Checklist
+
+Before shipping this in production:
+
+- use persistent storage, not `memoryAdapter()`
+- use a shared rate limiter across instances
+- configure a real email delivery provider
+- run behind HTTPS only
+- set exact `rpID` and `origin` values for your deployed domains
+- harden cookies/sessions in the host app
+- monitor auth failures, magic-link delivery, and rate-limit events
+- decide whether `email-available` should be exposed publicly at all
+
+## Publishing
+
+- `CHANGELOG.md` tracks notable changes
+- `SECURITY.md` documents reporting and deployment guidance
+- `RELEASE.md` contains a release checklist
+- `prepublishOnly` runs tests and build before publishing
 
 ### Lifecycle Hooks
 
