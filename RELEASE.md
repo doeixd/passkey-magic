@@ -9,6 +9,16 @@
 - verify `SECURITY.md` still reflects current deployment guidance
 - confirm package version in `package.json`
 
+## Current Release Highlights
+
+- grouped high-level APIs for passkeys, magic links, QR, and accounts
+- persisted auth method metadata on sessions
+- QR state machine hardening with desktop `statusToken`
+- metadata support with end-to-end generic typing
+- better-auth plugin and client integration, including metadata generics
+- pluggable rate limiting with in-memory and unstorage-backed implementations
+- production, security, and publishing documentation
+
 ## Production Readiness Checklist
 
 - persistent storage configured

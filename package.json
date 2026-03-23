@@ -3,6 +3,21 @@
   "version": "0.1.0",
   "description": "Passkey-first authentication with QR cross-device login and magic link fallback",
   "type": "module",
+  "sideEffects": false,
+  "homepage": "https://github.com/doeixd/passkey-magic#readme",
+  "bugs": {
+    "url": "https://github.com/doeixd/passkey-magic/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/doeixd/passkey-magic.git"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     "./server": {
       "import": "./dist/server/index.mjs",
