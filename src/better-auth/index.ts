@@ -31,6 +31,35 @@ type AuthInstance<
   TCredentialMetadata extends MetadataObject = MetadataObject,
 > = ReturnType<typeof createAuth<TUserMetadata, TCredentialMetadata>>
 
+const BETTER_AUTH_RATE_LIMIT_PATHS = {
+  'passkey.register.options': '/passkey-magic/register/options',
+  'passkey.authenticate.options': '/passkey-magic/authenticate/options',
+  'passkey.authenticate.verify': '/passkey-magic/authenticate/verify',
+  'magicLink.send': '/passkey-magic/magic-link/send',
+  'magicLink.verify': '/passkey-magic/magic-link/verify',
+  'qr.create': '/passkey-magic/qr/create',
+} as const
+
+function buildBetterAuthRateLimit(rateLimit?: AuthRateLimitConfig) {
+  const routes = Object.entries(BETTER_AUTH_RATE_LIMIT_PATHS) as Array<
+    [keyof typeof BETTER_AUTH_RATE_LIMIT_PATHS, string]
+  >
+
+  return routes.flatMap(([route, path]) => {
+    const rule = rateLimit?.rules?.[route]
+    if (rule === null) return []
+    if (!rule) return []
+
+    return [{
+      pathMatcher(requestPath: string) {
+        return requestPath === path
+      },
+      window: Math.max(1, Math.ceil(rule.windowMs / 1000)),
+      max: rule.limit,
+    }]
+  })
+}
+
 // ── Schema ──
 
 const passkeyCredentialSchema = {
@@ -550,6 +579,7 @@ export function passkeyMagicPlugin<
 
   return {
     id: 'passkey-magic',
+    rateLimit: buildBetterAuthRateLimit(options.rateLimit),
     schema: {
       passkeyCredential: passkeyCredentialSchema,
       qrSession: qrSessionSchema,

@@ -311,6 +311,57 @@ const prodAuth = createAuth({
 
 If you use the better-auth plugin, you can pass the same `rateLimit` config there too.
 
+When used as a Better Auth plugin, `passkey-magic` also exposes Better Auth-native plugin `rateLimit` rules for sensitive plugin endpoints when you configure `rateLimit.rules`.
+
+### better-auth Cookies And Deployment
+
+The Better Auth integration creates real Better Auth sessions and writes cookies through Better Auth's cookie system. That means Better Auth cookie settings apply to this plugin too, including:
+
+- cookie prefixes and custom cookie names
+- secure cookie behavior
+- cross-subdomain cookie settings
+- Safari/ITP deployment constraints
+
+Recommended setup:
+
+- keep frontend and Better Auth endpoints on the same site when possible
+- use a reverse proxy or a shared parent domain for Safari compatibility
+- configure Better Auth `advanced.crossSubDomainCookies` only when needed
+- use Better Auth secure cookie settings in production
+
+Example:
+
+```ts
+import { betterAuth } from 'better-auth'
+import { passkeyMagicPlugin } from 'passkey-magic/better-auth'
+import { createUnstorageRateLimiter } from 'passkey-magic/server'
+import { createStorage } from 'unstorage'
+
+const auth = betterAuth({
+  trustedOrigins: ['https://app.example.com'],
+  advanced: {
+    useSecureCookies: true,
+    crossSubDomainCookies: {
+      enabled: true,
+      domain: 'example.com',
+    },
+  },
+  plugins: [
+    passkeyMagicPlugin({
+      rpName: 'My App',
+      rpID: 'example.com',
+      origin: 'https://app.example.com',
+      rateLimit: {
+        limiter: createUnstorageRateLimiter(createStorage()),
+        rules: {
+          'magicLink.send': { limit: 5, windowMs: 15 * 60 * 1000 },
+        },
+      },
+    }),
+  ],
+})
+```
+
 ## Production Checklist
 
 Before shipping this in production:

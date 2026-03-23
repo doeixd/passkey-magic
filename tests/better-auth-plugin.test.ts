@@ -124,6 +124,23 @@ describe('passkeyMagicPlugin', () => {
       const plugin = makePlugin()
       expect(Object.keys(plugin.endpoints)).toHaveLength(17)
     })
+
+    it('defines Better Auth-native rate limit rules for sensitive endpoints when configured', () => {
+      const plugin = passkeyMagicPlugin({
+        ...baseOptions,
+        rateLimit: {
+          rules: {
+            'magicLink.send': { limit: 5, windowMs: 15 * 60 * 1000 },
+            'qr.create': { limit: 10, windowMs: 60 * 1000 },
+          },
+        },
+      })
+
+      expect(plugin.rateLimit).toBeDefined()
+      expect(plugin.rateLimit).toHaveLength(2)
+      expect(plugin.rateLimit?.some((rule) => rule.pathMatcher('/passkey-magic/magic-link/send') && rule.max === 5)).toBe(true)
+      expect(plugin.rateLimit?.some((rule) => rule.pathMatcher('/passkey-magic/qr/create') && rule.window === 60)).toBe(true)
+    })
   })
 })
 
