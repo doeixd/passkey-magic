@@ -114,9 +114,15 @@ describe('passkeyMagicPlugin', () => {
       expect(plugin.endpoints.passkeyMagicMagicLinkVerify).toBeDefined()
     })
 
-    it('has 15 total endpoints', () => {
+    it('defines account identity endpoints', () => {
       const plugin = makePlugin()
-      expect(Object.keys(plugin.endpoints)).toHaveLength(15)
+      expect(plugin.endpoints.passkeyMagicAccountByEmail).toBeDefined()
+      expect(plugin.endpoints.passkeyMagicAccountCanLinkEmail).toBeDefined()
+    })
+
+    it('has 17 total endpoints', () => {
+      const plugin = makePlugin()
+      expect(Object.keys(plugin.endpoints)).toHaveLength(17)
     })
   })
 })

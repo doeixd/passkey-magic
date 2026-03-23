@@ -652,6 +652,38 @@ export function passkeyMagicPlugin(options: PasskeyMagicPluginOptions) {
         },
       ),
 
+      passkeyMagicAccountByEmail: createAuthEndpoint(
+        '/passkey-magic/account/by-email',
+        {
+          method: 'POST',
+          body: z.object({
+            email: z.string(),
+          }),
+        },
+        async (ctx) => {
+          const auth = getAuth(ctx)
+          const user = await auth.accounts.getByEmail(ctx.body.email)
+          return ctx.json({ user })
+        },
+      ),
+
+      passkeyMagicAccountCanLinkEmail: createAuthEndpoint(
+        '/passkey-magic/account/can-link-email',
+        {
+          method: 'POST',
+          use: [sessionMiddleware],
+          body: z.object({
+            email: z.string(),
+          }),
+        },
+        async (ctx) => {
+          const auth = getAuth(ctx)
+          const userId = ctx.context.session.user.id
+          const result = await auth.accounts.canLinkEmail({ userId, email: ctx.body.email })
+          return ctx.json(result)
+        },
+      ),
+
       // ── QR Cross-Device ──
       passkeyMagicQrCreate: createAuthEndpoint(
         '/passkey-magic/qr/create',

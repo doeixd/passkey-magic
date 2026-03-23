@@ -47,6 +47,7 @@ export interface PasskeyMagicClient {
 
   accounts: {
     get(): Promise<{ user: User }>
+    getByEmail(email: string): Promise<{ user: User | null }>
     isEmailAvailable(email: string): Promise<boolean>
     canLinkEmail(email: string): Promise<EmailLinkability>
     linkEmail(email: string): Promise<{ user: User }>
@@ -215,21 +216,12 @@ export function createClient(config: ClientConfig): PasskeyMagicClient {
     },
     accounts: {
       get: () => config.request('/account'),
+      getByEmail: (email) => config.request('/account/by-email', { email }),
       async isEmailAvailable(email) {
         const result = await config.request<{ available: boolean }>('/account/email-available', { email })
         return result.available
       },
-      async canLinkEmail(email) {
-        const account = await config.request<{ user: User }>('/account')
-        if (!/^\S+@\S+\.\S+$/.test(email)) {
-          return { ok: false, reason: 'invalid_email' }
-        }
-        if (account.user.email === email) {
-          return { ok: true }
-        }
-        const available = await client.accounts.isEmailAvailable(email)
-        return available ? { ok: true } : { ok: false, reason: 'email_in_use' }
-      },
+      canLinkEmail: (email) => config.request('/account/can-link-email', { email }),
       linkEmail: (email) => config.request('/account/link-email', { email }),
       unlinkEmail: () => config.request('/account/unlink-email', {}),
       async delete() {

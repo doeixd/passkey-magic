@@ -636,6 +636,36 @@ describe('createAuth', () => {
       expect(body.user.id).toBe('u1')
     })
 
+    it('supports account identity helper routes', async () => {
+      const auth = makeAuth()
+      const handler = auth.createHandler()
+
+      await storage.createUser({ id: 'u1', email: 'a@b.com', createdAt: new Date() })
+      await storage.createSession({
+        id: 's1', token: 'valid-token', userId: 'u1', authMethod: 'passkey',
+        expiresAt: new Date(Date.now() + 10000), createdAt: new Date(),
+      })
+
+      const byEmailRes = await handler(new Request('http://localhost/auth/account/by-email', {
+        method: 'POST',
+        body: JSON.stringify({ email: 'a@b.com' }),
+        headers: { 'Content-Type': 'application/json' },
+      }))
+      expect(byEmailRes.status).toBe(200)
+      expect((await byEmailRes.json()).user.id).toBe('u1')
+
+      const canLinkRes = await handler(new Request('http://localhost/auth/account/can-link-email', {
+        method: 'POST',
+        body: JSON.stringify({ email: 'free@example.com' }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer valid-token',
+        },
+      }))
+      expect(canLinkRes.status).toBe(200)
+      expect(await canLinkRes.json()).toEqual({ ok: true })
+    })
+
     it('lists sessions for authenticated user', async () => {
       const auth = makeAuth()
       const handler = auth.createHandler()
