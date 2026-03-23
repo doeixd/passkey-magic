@@ -429,6 +429,36 @@ const auth = betterAuth({
 })
 ```
 
+### Focused Better Auth QR Plugin
+
+If you already use Better Auth's own passkey and magic-link features and only want the QR cross-device layer, use the focused additive QR submodule:
+
+```ts
+import { betterAuth } from 'better-auth'
+import { passkeyMagicQRPlugin } from 'passkey-magic/better-auth/qr'
+
+const auth = betterAuth({
+  plugins: [
+    passkeyMagicQRPlugin({
+      rpName: 'My App',
+      rpID: 'example.com',
+      origin: 'https://app.example.com',
+    }),
+  ],
+})
+```
+
+And on the client:
+
+```ts
+import { createAuthClient } from 'better-auth/client'
+import { passkeyMagicQRClientPlugin } from 'passkey-magic/better-auth/qr/client'
+
+const authClient = createAuthClient({
+  plugins: [passkeyMagicQRClientPlugin()],
+})
+```
+
 ## Production Checklist
 
 Before shipping this in production:

@@ -46,6 +46,14 @@
     "./better-auth/client": {
       "import": "./dist/better-auth/client.mjs",
       "types": "./dist/better-auth/client.d.mts"
+    },
+    "./better-auth/qr": {
+      "import": "./dist/better-auth/qr/index.mjs",
+      "types": "./dist/better-auth/qr/index.d.mts"
+    },
+    "./better-auth/qr/client": {
+      "import": "./dist/better-auth/qr/client.mjs",
+      "types": "./dist/better-auth/qr/client.d.mts"
     }
   },
   "files": [

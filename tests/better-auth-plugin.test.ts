@@ -1,6 +1,8 @@
 import { describe, it, expect, expectTypeOf, vi, beforeEach } from 'vitest'
 import { passkeyMagicPlugin } from '../src/better-auth/index.js'
 import { passkeyMagicClientPlugin } from '../src/better-auth/client.js'
+import { passkeyMagicQRPlugin } from '../src/better-auth/qr/index.js'
+import { passkeyMagicQRClientPlugin } from '../src/better-auth/qr/client.js'
 
 describe('passkeyMagicPlugin', () => {
   const baseOptions = {
@@ -221,5 +223,52 @@ describe('passkeyMagicClientPlugin', () => {
       label?: string
       metadata?: CredentialMeta
     }>()
+  })
+})
+
+describe('passkeyMagicQRPlugin', () => {
+  const baseOptions = {
+    rpName: 'Test App',
+    rpID: 'localhost',
+    origin: 'http://localhost:3000',
+  }
+
+  it('exposes only QR-focused endpoints', () => {
+    const plugin = passkeyMagicQRPlugin(baseOptions)
+    expect(plugin.id).toBe('passkey-magic-qr')
+    expect(plugin.endpoints?.passkeyMagicQrCreate).toBeDefined()
+    expect(plugin.endpoints?.passkeyMagicQrStatus).toBeDefined()
+    expect(plugin.endpoints?.passkeyMagicQrScanned).toBeDefined()
+    expect(plugin.endpoints?.passkeyMagicQrConfirm).toBeDefined()
+    expect(plugin.endpoints?.passkeyMagicQrComplete).toBeDefined()
+    expect(plugin.endpoints?.passkeyMagicRegisterOptions).toBeUndefined()
+    expect(plugin.endpoints?.passkeyMagicMagicLinkSend).toBeUndefined()
+  })
+
+  it('keeps only QR-related schemas', () => {
+    const plugin = passkeyMagicQRPlugin(baseOptions)
+    expect(plugin.schema?.passkeyCredential).toBeDefined()
+    expect(plugin.schema?.passkeyChallenge).toBeDefined()
+    expect(plugin.schema?.qrSession).toBeDefined()
+    expect(plugin.schema?.magicLinkToken).toBeUndefined()
+  })
+})
+
+describe('passkeyMagicQRClientPlugin', () => {
+  it('exposes focused QR client actions', async () => {
+    const client = passkeyMagicQRClientPlugin()
+    const $fetch = vi.fn(async () => ({ ok: true }))
+    const actions = client.getActions?.($fetch as any)
+
+    expect(actions?.passkeyMagicQr.create).toBeTypeOf('function')
+    expect(actions?.passkeyMagicQr.status).toBeTypeOf('function')
+    expect(actions?.passkeyMagicQr.confirm).toBeTypeOf('function')
+    expect((actions as any)?.passkeyMagic).toBeUndefined()
+
+    await actions?.passkeyMagicQr.status('qr-1', 'status-token')
+    expect($fetch).toHaveBeenCalledWith('/passkey-magic/qr/status', {
+      method: 'GET',
+      query: { sessionId: 'qr-1', statusToken: 'status-token' },
+    })
   })
 })

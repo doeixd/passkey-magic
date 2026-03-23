@@ -9,6 +9,8 @@ export default defineConfig({
     'src/nitro/index.ts',
     'src/better-auth/index.ts',
     'src/better-auth/client.ts',
+    'src/better-auth/qr/index.ts',
+    'src/better-auth/qr/client.ts',
   ],
   format: 'esm',
   dts: true,
