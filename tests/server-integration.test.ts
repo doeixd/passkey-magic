@@ -29,6 +29,10 @@ describe('createAuth', () => {
       expect(auth.verifyRegistration).toBeTypeOf('function')
       expect(auth.generateAuthenticationOptions).toBeTypeOf('function')
       expect(auth.verifyAuthentication).toBeTypeOf('function')
+      expect(auth.passkeys.register.start).toBeTypeOf('function')
+      expect(auth.passkeys.register.finish).toBeTypeOf('function')
+      expect(auth.passkeys.signIn.start).toBeTypeOf('function')
+      expect(auth.passkeys.signIn.finish).toBeTypeOf('function')
     })
 
     it('has passkey management methods', () => {
@@ -38,6 +42,11 @@ describe('createAuth', () => {
       expect(auth.updateCredential).toBeTypeOf('function')
       expect(auth.removeCredential).toBeTypeOf('function')
       expect(auth.getUserCredentials).toBeTypeOf('function')
+      expect(auth.passkeys.add.start).toBeTypeOf('function')
+      expect(auth.passkeys.add.finish).toBeTypeOf('function')
+      expect(auth.passkeys.list).toBeTypeOf('function')
+      expect(auth.passkeys.update).toBeTypeOf('function')
+      expect(auth.passkeys.remove).toBeTypeOf('function')
     })
 
     it('has QR methods', () => {
@@ -46,6 +55,11 @@ describe('createAuth', () => {
       expect(auth.getQRSessionStatus).toBeTypeOf('function')
       expect(auth.markQRSessionScanned).toBeTypeOf('function')
       expect(auth.completeQRSession).toBeTypeOf('function')
+      expect(auth.qr.create).toBeTypeOf('function')
+      expect(auth.qr.getStatus).toBeTypeOf('function')
+      expect(auth.qr.markScanned).toBeTypeOf('function')
+      expect(auth.qr.complete).toBeTypeOf('function')
+      expect(auth.qr.cancel).toBeTypeOf('function')
     })
 
     it('has session management methods', () => {
@@ -83,9 +97,11 @@ describe('createAuth', () => {
       const auth = makeAuth({
         email: { sendMagicLink: vi.fn(async () => {}) },
         magicLinkURL: 'http://localhost:3000/auth/verify',
-      })
+      }) as any
       expect(auth.sendMagicLink).toBeTypeOf('function')
       expect(auth.verifyMagicLink).toBeTypeOf('function')
+      expect(auth.magicLinks.send).toBeTypeOf('function')
+      expect(auth.magicLinks.verify).toBeTypeOf('function')
     })
   })
 
@@ -109,7 +125,7 @@ describe('createAuth', () => {
         email: { sendMagicLink: vi.fn(async () => {}) },
         magicLinkURL: 'http://localhost:3000/auth/verify',
         hooks: { beforeMagicLink: async () => false },
-      })
+      }) as any
       await expect(
         auth.sendMagicLink({ email: 'test@example.com' }),
       ).rejects.toThrow('Magic link blocked by hook')
@@ -130,6 +146,42 @@ describe('createAuth', () => {
     })
   })
 
+  describe('grouped API aliases', () => {
+    it('delegates passkey register.start to generateRegistrationOptions', async () => {
+      const auth = makeAuth()
+      const result = await auth.passkeys.register.start({ email: 'grouped@example.com' })
+      expect(result.userId).toBeTruthy()
+      expect(result.options.challenge).toBeTruthy()
+    })
+
+    it('delegates qr aliases to base methods', async () => {
+      const auth = makeAuth()
+      const { sessionId } = await auth.qr.create()
+      expect((await auth.qr.getStatus(sessionId)).state).toBe('created')
+      await auth.qr.markScanned(sessionId)
+      expect((await auth.getQRSessionStatus(sessionId)).state).toBe('scanned')
+      await auth.qr.cancel(sessionId)
+      expect((await auth.qr.getStatus(sessionId)).state).toBe('cancelled')
+    })
+
+    it('delegates magic link aliases to base methods', async () => {
+      const sentEmails: { token: string }[] = []
+      const auth = makeAuth({
+        email: {
+          sendMagicLink: vi.fn(async (_email: string, _url: string, token: string) => {
+            sentEmails.push({ token })
+          }),
+        } as EmailAdapter,
+        magicLinkURL: 'http://localhost:3000/auth/verify',
+      }) as any
+
+      await auth.magicLinks.send({ email: 'grouped@example.com' })
+      const result = await auth.magicLinks.verify({ token: sentEmails[0].token })
+      expect(result.method).toBe('magic-link')
+      expect(result.session.authMethod).toBe('magic-link')
+    })
+  })
+
   // ── Magic Link Flow ──
 
   describe('magic link full flow', () => {
@@ -142,7 +194,7 @@ describe('createAuth', () => {
           }),
         } as EmailAdapter,
         magicLinkURL: 'http://localhost:3000/auth/verify',
-      })
+      }) as any
 
       const userCreated = vi.fn()
       const sessionCreated = vi.fn()
@@ -166,7 +218,7 @@ describe('createAuth', () => {
       const auth = makeAuth({
         email: { sendMagicLink: vi.fn(async () => {}) } as EmailAdapter,
         magicLinkURL: 'http://localhost:3000/auth/verify',
-      })
+      }) as any
       await expect(auth.sendMagicLink({ email: 'not-an-email' })).rejects.toThrow('Invalid email')
     })
   })

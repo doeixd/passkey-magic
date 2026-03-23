@@ -8,6 +8,43 @@ import { createClientMagicLinkManager } from './magic-link.js'
  * via the `request` function you provide in config.
  */
 export interface PasskeyMagicClient {
+  passkeys: {
+    register: (params?: { userId?: string; email?: string; userName?: string }) => Promise<{
+      method: 'passkey'
+      user: { id: string; email?: string }
+      session: { token: string; expiresAt: string; authMethod: 'passkey'; authContext?: { qrSessionId?: string } }
+      credential: { id: string }
+    }>
+    signIn: (params?: { userId?: string }) => Promise<{
+      method: 'passkey'
+      user: { id: string; email?: string }
+      session: { token: string; expiresAt: string; authMethod: 'passkey'; authContext?: { qrSessionId?: string } }
+    }>
+    add: (params?: { userName?: string }) => Promise<{ credential: { id: string } }>
+    list(userId?: string): Promise<{ credentials: Credential[] }>
+    update(params: { credentialId: string; label: string }): Promise<void>
+    remove(credentialId: string): Promise<void>
+  }
+
+  qr: {
+    create(): Promise<{ sessionId: string }>
+    render(url: string, opts?: { border?: number }): string
+    renderText(url: string, opts?: { border?: number }): string
+    poll(sessionId: string, opts?: { interval?: number; signal?: AbortSignal }): AsyncIterable<QRSessionStatus>
+    complete(params: { sessionId: string }): Promise<void>
+    cancel(sessionId: string): Promise<void>
+  }
+
+  magicLinks: {
+    request(params: { email: string }): Promise<{ sent: true }>
+    verify(params: { token: string }): Promise<{
+      method: 'magic-link'
+      user: { id: string; email?: string }
+      session: { token: string; expiresAt: string; authMethod: 'magic-link'; authContext?: { qrSessionId?: string } }
+      isNewUser: boolean
+    }>
+  }
+
   // ── Passkey ──
 
   /** Check if the browser supports WebAuthn. */
@@ -135,7 +172,39 @@ export function createClient(config: ClientConfig): PasskeyMagicClient {
   const qr = createClientQRManager(config)
   const magicLink = createClientMagicLinkManager(config)
 
-  return {
+  const client: PasskeyMagicClient = {
+    passkeys: {
+      register: (params) => passkey.register(params),
+      signIn: (params) => passkey.authenticate(params),
+      async add(params) {
+        const { options } = await config.request<{
+          options: Parameters<typeof import('@simplewebauthn/browser').startRegistration>[0]['optionsJSON']
+        }>('/passkey/add/options', params ?? {})
+        const { startRegistration } = await import('@simplewebauthn/browser')
+        const response = await startRegistration({ optionsJSON: options })
+        return config.request('/passkey/add/verify', { response })
+      },
+      list: () => config.request('/account/credentials'),
+      async update({ credentialId, label }) {
+        await config.request(`/account/credentials/${credentialId}`, { label })
+      },
+      async remove(credentialId) {
+        await config.request(`/account/credentials/${credentialId}/delete`, {})
+      },
+    },
+    qr: {
+      create: () => qr.createSession(),
+      render: (url, opts) => qr.renderSVG(url, opts),
+      renderText: (url, opts) => qr.renderText(url, opts),
+      poll: (id, opts) => qr.pollSession(id, opts),
+      complete: (params) => qr.completeSession(params),
+      cancel: (sessionId) => qr.cancelSession(sessionId),
+    },
+    magicLinks: {
+      request: (params) => magicLink.send(params),
+      verify: (params) => magicLink.verify(params),
+    },
+
     // Passkey
     supportsPasskeys: () => passkey.supportsPasskeys(),
     supportsAutofill: () => passkey.supportsAutofill(),
@@ -207,6 +276,8 @@ export function createClient(config: ClientConfig): PasskeyMagicClient {
       await config.request('/account/delete', {})
     },
   }
+
+  return client
 }
 
 // Re-export types

@@ -78,6 +78,22 @@ If a magic link is verified for an email that already belongs to a user, the exi
 
 ### Passkey Authentication
 
+High-level grouped aliases are also available if you prefer intent-based naming:
+
+```ts
+const { userId, options } = await auth.passkeys.register.start({
+  email: 'user@example.com',
+})
+
+const result = await auth.passkeys.register.finish({
+  userId,
+  response: browserResponse,
+})
+
+const { options: signInOptions } = await auth.passkeys.signIn.start()
+const signIn = await auth.passkeys.signIn.finish({ response: browserResponse })
+```
+
 ```ts
 // Server: generate options, verify response
 const { options, userId } = await auth.generateRegistrationOptions({ email: 'user@example.com' })
@@ -97,6 +113,7 @@ Polling stops automatically once the session reaches `authenticated`, `expired`,
 ```ts
 // Desktop: create session and display QR code
 const { sessionId } = await auth.createQRSession()
+const sameSession = await auth.qr.create()
 const qrSvg = client.renderQR(`https://example.com/auth/qr/${sessionId}`)
 
 // Desktop: poll for completion
@@ -111,6 +128,7 @@ await client.completeQRSession({ sessionId })
 
 // Optional: cancel an in-flight QR login
 await client.cancelQRSession(sessionId)
+await auth.qr.cancel(sessionId)
 ```
 
 ### Magic Links
@@ -131,9 +149,11 @@ const auth = createAuth({
 
 // Send a magic link
 await auth.sendMagicLink({ email: 'user@example.com' })
+await auth.magicLinks.send({ email: 'user@example.com' })
 
 // Verify (after user clicks the link)
 const { user, session, isNewUser } = await auth.verifyMagicLink({ token })
+const sameResult = await auth.magicLinks.verify({ token })
 ```
 
 ### Passkey Management

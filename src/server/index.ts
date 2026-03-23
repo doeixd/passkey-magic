@@ -20,10 +20,60 @@ import { createMagicLinkManager } from './magic-link.js'
 import { createQRSessionManager } from './qr-session.js'
 import { createHandler } from './handler.js'
 
+export interface PasskeyNamespace {
+  register: {
+    start(params: { userId?: string; email?: string; userName?: string }): Promise<{
+      options: PublicKeyCredentialCreationOptionsJSON
+      userId: string
+    }>
+    finish(params: {
+      userId: string
+      response: RegistrationResponseJSON
+    }): Promise<AuthResult & { method: 'passkey'; credential: Credential }>
+  }
+  signIn: {
+    start(params?: { userId?: string }): Promise<{ options: PublicKeyCredentialRequestOptionsJSON }>
+    finish(params: {
+      response: AuthenticationResponseJSON
+    }): Promise<AuthResult & { method: 'passkey' }>
+  }
+  add: {
+    start(params: { userId: string; userName?: string }): Promise<{
+      options: PublicKeyCredentialCreationOptionsJSON
+    }>
+    finish(params: { userId: string; response: RegistrationResponseJSON }): Promise<{ credential: Credential }>
+  }
+  list(userId: string): Promise<Credential[]>
+  update(params: { credentialId: string; label: string }): Promise<void>
+  remove(credentialId: string): Promise<void>
+}
+
+export interface QRNamespace {
+  create(): Promise<{ sessionId: string }>
+  getStatus(sessionId: string): Promise<QRSessionStatus>
+  markScanned(sessionId: string): Promise<void>
+  complete(params: {
+    sessionId: string
+    response: AuthenticationResponseJSON
+  }): Promise<AuthResult & { method: 'qr' }>
+  cancel(sessionId: string): Promise<void>
+}
+
+export interface MagicLinkNamespace {
+  send(params: { email: string }): Promise<{ sent: true }>
+  verify(params: { token: string }): Promise<AuthResult & { method: 'magic-link' }>
+}
+
 // ── Base methods (always available) ──
 
 /** Methods available on every `createAuth()` instance regardless of config. */
 export interface BaseAuthMethods {
+  /** High-level passkey namespace. */
+  passkeys: PasskeyNamespace
+
+  /** High-level QR namespace. */
+  qr: QRNamespace
+
   // ── Passkey Registration ──
 
   /**
@@ -180,7 +230,7 @@ export interface BaseAuthMethods {
 
 /** Full auth instance type. Magic link methods are present only when `EmailAdapter` is configured. */
 export type AuthInstance<TEmail> = BaseAuthMethods &
-  (TEmail extends EmailAdapter ? MagicLinkMethods : unknown)
+  (TEmail extends EmailAdapter ? MagicLinkMethods & { magicLinks: MagicLinkNamespace } : unknown)
 
 // ── Default TTLs ──
 
@@ -242,6 +292,9 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
   })
 
   const base: BaseAuthMethods = {
+    passkeys: undefined as unknown as PasskeyNamespace,
+    qr: undefined as unknown as QRNamespace,
+
     // ── Passkey Registration ──
     async generateRegistrationOptions(params) {
       if (hooks.beforeRegister) {
@@ -482,6 +535,32 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
     },
   }
 
+  base.passkeys = {
+    register: {
+      start: (params) => base.generateRegistrationOptions(params),
+      finish: (params) => base.verifyRegistration(params),
+    },
+    signIn: {
+      start: (params) => base.generateAuthenticationOptions(params),
+      finish: (params) => base.verifyAuthentication(params),
+    },
+    add: {
+      start: (params) => base.addPasskey(params),
+      finish: (params) => base.verifyAddPasskey(params),
+    },
+    list: (userId) => base.getUserCredentials(userId),
+    update: (params) => base.updateCredential(params),
+    remove: (credentialId) => base.removeCredential(credentialId),
+  }
+
+  base.qr = {
+    create: () => base.createQRSession(),
+    getStatus: (sessionId) => base.getQRSessionStatus(sessionId),
+    markScanned: (sessionId) => base.markQRSessionScanned(sessionId),
+    complete: (params) => base.completeQRSession(params),
+    cancel: (sessionId) => base.cancelQRSession(sessionId),
+  }
+
   // ── Magic Link (conditional) ──
   if (config.email) {
     const magicLinks = createMagicLinkManager(config.storage, config.email, {
@@ -490,7 +569,7 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
       generateId: config.generateId,
     })
 
-    const magicLinkMethods: MagicLinkMethods = {
+    const magicLinkMethods: MagicLinkMethods & { magicLinks: MagicLinkNamespace } = {
       async sendMagicLink({ email }) {
         if (hooks.beforeMagicLink) {
           const result = await hooks.beforeMagicLink({ email })
@@ -515,6 +594,11 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
         }
 
         return { method: 'magic-link' as const, user, session, isNewUser }
+      },
+
+      magicLinks: {
+        send: (params) => magicLinkMethods.sendMagicLink(params),
+        verify: (params) => magicLinkMethods.verifyMagicLink(params),
       },
     }
 
