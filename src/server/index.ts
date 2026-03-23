@@ -252,7 +252,7 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
       const existingUser = await config.storage.getUserById(userId)
       const { user, credential } = await passkeys.verifyRegistration({ userId, response })
 
-      const session = await sessions.create(user.id)
+      const session = await sessions.create(user.id, 'passkey')
 
       if (!existingUser) {
         emitter.emit('user:created', { user })
@@ -278,7 +278,7 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
 
     async verifyAuthentication({ response }) {
       const { user } = await passkeys.verifyAuthentication({ response })
-      const session = await sessions.create(user.id)
+      const session = await sessions.create(user.id, 'passkey')
 
       emitter.emit('session:created', { session, user, method: 'passkey' })
 
@@ -359,7 +359,9 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
         if (result === false) throw new Error('QR completion blocked by hook')
       }
 
-      const session = await sessions.create(user.id)
+      const session = await sessions.create(user.id, 'qr', {
+        authContext: { qrSessionId: sessionId },
+      })
 
       await config.storage.updateQRSession(sessionId, {
         state: 'authenticated',
@@ -497,7 +499,7 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
 
       async verifyMagicLink({ token }) {
         const { user, isNewUser } = await magicLinks.verify({ token })
-        const session = await sessions.create(user.id)
+        const session = await sessions.create(user.id, 'magic-link')
 
         if (isNewUser) {
           emitter.emit('user:created', { user })

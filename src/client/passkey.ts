@@ -23,7 +23,7 @@ export interface ClientPasskeyManager {
   }): Promise<{
     method: 'passkey'
     user: { id: string; email?: string }
-    session: { token: string; expiresAt: string }
+    session: { token: string; expiresAt: string; authMethod: 'passkey'; authContext?: { qrSessionId?: string } }
     credential: { id: string }
   }>
 
@@ -32,7 +32,7 @@ export interface ClientPasskeyManager {
   }): Promise<{
     method: 'passkey'
     user: { id: string; email?: string }
-    session: { token: string; expiresAt: string }
+    session: { token: string; expiresAt: string; authMethod: 'passkey'; authContext?: { qrSessionId?: string } }
   }>
 }
 

@@ -115,6 +115,7 @@ describe('memoryAdapter', () => {
         id: 's1',
         token: 'tok1',
         userId: 'u1',
+        authMethod: 'passkey',
         expiresAt: new Date(Date.now() + 10000),
         createdAt: new Date(),
       })
@@ -125,10 +126,12 @@ describe('memoryAdapter', () => {
     it('lists sessions by user id (excluding expired)', async () => {
       await storage.createSession({
         id: 's-active', token: 'tok-active', userId: 'u1',
+        authMethod: 'passkey',
         expiresAt: new Date(Date.now() + 10000), createdAt: new Date(),
       })
       await storage.createSession({
         id: 's-expired', token: 'tok-expired', userId: 'u1',
+        authMethod: 'magic-link',
         expiresAt: new Date(Date.now() - 1000), createdAt: new Date(),
       })
       const sessions = await storage.getSessionsByUserId('u1')
@@ -141,6 +144,7 @@ describe('memoryAdapter', () => {
         id: 's2',
         token: 'tok2',
         userId: 'u1',
+        authMethod: 'passkey',
         expiresAt: new Date(Date.now() - 1000),
         createdAt: new Date(),
       })
@@ -152,6 +156,7 @@ describe('memoryAdapter', () => {
         id: 's3',
         token: 'tok3',
         userId: 'u1',
+        authMethod: 'passkey',
         expiresAt: new Date(Date.now() + 10000),
         createdAt: new Date(),
       })
@@ -159,6 +164,7 @@ describe('memoryAdapter', () => {
         id: 's4',
         token: 'tok4',
         userId: 'u1',
+        authMethod: 'passkey',
         expiresAt: new Date(Date.now() + 10000),
         createdAt: new Date(),
       })

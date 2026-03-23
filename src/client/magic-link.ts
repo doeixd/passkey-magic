@@ -6,7 +6,7 @@ export interface ClientMagicLinkManager {
   verify(params: { token: string }): Promise<{
     method: 'magic-link'
     user: { id: string; email?: string }
-    session: { token: string; expiresAt: string }
+    session: { token: string; expiresAt: string; authMethod: 'magic-link'; authContext?: { qrSessionId?: string } }
     isNewUser: boolean
   }>
 }

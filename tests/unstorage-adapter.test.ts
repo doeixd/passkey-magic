@@ -123,6 +123,7 @@ describe('unstorageAdapter', () => {
         id: 's1',
         token: 'tok1',
         userId: 'u1',
+        authMethod: 'passkey',
         expiresAt: new Date(Date.now() + 10000),
         createdAt: new Date(),
       })
@@ -134,10 +135,12 @@ describe('unstorageAdapter', () => {
     it('lists sessions by user id (excluding expired)', async () => {
       await adapter.createSession({
         id: 's-live', token: 'tok-live', userId: 'u1',
+        authMethod: 'passkey',
         expiresAt: new Date(Date.now() + 10000), createdAt: new Date(),
       })
       await adapter.createSession({
         id: 's-dead', token: 'tok-dead', userId: 'u1',
+        authMethod: 'magic-link',
         expiresAt: new Date(Date.now() - 1000), createdAt: new Date(),
       })
       const sessions = await adapter.getSessionsByUserId('u1')
@@ -150,6 +153,7 @@ describe('unstorageAdapter', () => {
         id: 's2',
         token: 'tok2',
         userId: 'u1',
+        authMethod: 'passkey',
         expiresAt: new Date(Date.now() - 1000),
         createdAt: new Date(),
       })
@@ -161,6 +165,7 @@ describe('unstorageAdapter', () => {
         id: 's3',
         token: 'tok3',
         userId: 'u1',
+        authMethod: 'passkey',
         expiresAt: new Date(Date.now() + 10000),
         createdAt: new Date(),
       })
@@ -168,6 +173,7 @@ describe('unstorageAdapter', () => {
         id: 's4',
         token: 'tok4',
         userId: 'u1',
+        authMethod: 'passkey',
         expiresAt: new Date(Date.now() + 10000),
         createdAt: new Date(),
       })

@@ -157,6 +157,7 @@ describe('createAuth', () => {
       expect(result.isNewUser).toBe(true)
       expect(result.user.email).toBe('new@example.com')
       expect(result.session.token).toBeTruthy()
+      expect(result.session.authMethod).toBe('magic-link')
       expect(userCreated).toHaveBeenCalledOnce()
       expect(sessionCreated).toHaveBeenCalledWith(expect.objectContaining({ method: 'magic-link' }))
     })
@@ -343,10 +344,12 @@ describe('createAuth', () => {
       await storage.createUser({ id: 'u1', createdAt: new Date() })
       await storage.createSession({
         id: 's1', token: 't1', userId: 'u1',
+        authMethod: 'passkey',
         expiresAt: new Date(Date.now() + 10000), createdAt: new Date(),
       })
       await storage.createSession({
         id: 's2', token: 't2', userId: 'u1',
+        authMethod: 'magic-link',
         expiresAt: new Date(Date.now() + 10000), createdAt: new Date(),
       })
 
@@ -358,6 +361,7 @@ describe('createAuth', () => {
       const auth = makeAuth()
       await storage.createSession({
         id: 's1', token: 't1', userId: 'u1',
+        authMethod: 'passkey',
         expiresAt: new Date(Date.now() + 10000), createdAt: new Date(),
       })
 
@@ -378,6 +382,7 @@ describe('createAuth', () => {
       })
       await storage.createSession({
         id: 's1', token: 't1', userId: 'u1',
+        authMethod: 'passkey',
         expiresAt: new Date(Date.now() + 10000), createdAt: new Date(),
       })
 
@@ -541,6 +546,7 @@ describe('createAuth', () => {
       await storage.createUser({ id: 'u1', email: 'a@b.com', createdAt: new Date() })
       await storage.createSession({
         id: 's1', token: 'valid-token', userId: 'u1',
+        authMethod: 'passkey',
         expiresAt: new Date(Date.now() + 10000), createdAt: new Date(),
       })
 
@@ -560,10 +566,12 @@ describe('createAuth', () => {
       await storage.createUser({ id: 'u1', createdAt: new Date() })
       await storage.createSession({
         id: 's1', token: 'tok1', userId: 'u1',
+        authMethod: 'passkey',
         expiresAt: new Date(Date.now() + 10000), createdAt: new Date(),
       })
       await storage.createSession({
         id: 's2', token: 'tok2', userId: 'u1',
+        authMethod: 'magic-link',
         expiresAt: new Date(Date.now() + 10000), createdAt: new Date(),
       })
 
@@ -582,6 +590,7 @@ describe('createAuth', () => {
       await storage.createUser({ id: 'u1', createdAt: new Date() })
       await storage.createSession({
         id: 's1', token: 'tok1', userId: 'u1',
+        authMethod: 'passkey',
         expiresAt: new Date(Date.now() + 10000), createdAt: new Date(),
       })
 

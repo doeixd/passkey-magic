@@ -3,7 +3,11 @@ import type { Session, StorageAdapter } from '../types.js'
 
 /** Internal session manager used by `createAuth()`. */
 export interface SessionManager {
-  create(userId: string, meta?: { userAgent?: string; ipAddress?: string }): Promise<Session>
+  create(
+    userId: string,
+    authMethod: Session['authMethod'],
+    meta?: { userAgent?: string; ipAddress?: string; authContext?: Session['authContext'] },
+  ): Promise<Session>
   validate(token: string): Promise<Session | null>
   listByUser(userId: string): Promise<Session[]>
   revoke(id: string): Promise<void>
@@ -17,15 +21,17 @@ export function createSessionManager(
   const id = opts.generateId ?? generateId
 
   return {
-    async create(userId, meta) {
+    async create(userId, authMethod, meta) {
       const session: Session = {
         id: id(),
         token: generateToken(),
         userId,
+        authMethod,
         expiresAt: new Date(Date.now() + opts.ttl),
         createdAt: new Date(),
         userAgent: meta?.userAgent,
         ipAddress: meta?.ipAddress,
+        authContext: meta?.authContext,
       }
       return storage.createSession(session)
     },

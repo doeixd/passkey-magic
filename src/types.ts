@@ -33,12 +33,17 @@ export interface Session {
   id: string
   token: string
   userId: string
+  authMethod: 'passkey' | 'magic-link' | 'qr'
   expiresAt: Date
   createdAt: Date
   /** User-agent string from the request that created the session. */
   userAgent?: string
   /** IP address from the request that created the session. */
   ipAddress?: string
+  /** Extra context about how the session was created. */
+  authContext?: {
+    qrSessionId?: string
+  }
 }
 
 /** A cross-device login session initiated by QR code scan. */
