@@ -13,10 +13,14 @@ The format is based on Keep a Changelog and the project aims to follow Semantic 
 - Additional QR security guidance and throttling for scan, confirm, and complete routes.
 - Client-side UX helpers including `AuthClientError`, QR flow helpers, session observation, passkey sign-in strategy selection, and magic-link URL helpers.
 - End-to-end abort-signal support across the client transport and most client methods.
+- Focused additive Better Auth QR submodule exports: `passkey-magic/better-auth/qr` and `passkey-magic/better-auth/qr/client`.
 
 ### Changed
 - Client APIs are more ergonomic with optional options objects for cancellation and control.
 - QR client polling now supports backoff and jitter controls.
+
+### Fixed
+- Magic-link bearer tokens, QR `statusToken` values, and QR confirmation codes are now hashed at rest.
 
 ## [0.2.0] - 2026-03-23
 

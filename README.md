@@ -459,6 +459,14 @@ const authClient = createAuthClient({
 })
 ```
 
+Use this focused QR submodule when:
+
+- Better Auth already handles your passkeys
+- Better Auth already handles your magic links or other account flows
+- you only want the QR session state machine and cross-device login UX from this library
+
+Use `passkey-magic/better-auth` instead when you want the broader integration layer from this package.
+
 ## Production Checklist
 
 Before shipping this in production:

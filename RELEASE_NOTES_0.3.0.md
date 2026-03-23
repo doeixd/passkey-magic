@@ -8,6 +8,7 @@ This release builds on `0.2.0` with stronger QR login protection and significant
 - Added more explicit QR threat-model documentation and additional QR route throttling.
 - Added client-side UX helpers for QR flows, magic-link callback handling, session observation, and sign-in strategy selection.
 - Added abort-signal support across the client transport and most client methods.
+- Added focused additive Better Auth QR submodule exports for apps that only need the QR gap layer.
 
 ## Notable Changes
 
@@ -15,6 +16,7 @@ This release builds on `0.2.0` with stronger QR login protection and significant
 - `client.qr.createFlow(...)` returns a more ergonomic QR flow object for frontend apps.
 - `client.waitForQRSession(...)`, `client.observeSession(...)`, and `client.getBestSignInMethod(...)` reduce common application glue code.
 - `AuthClientError` now normalizes transport errors into a more useful client-facing shape.
+- Magic-link tokens and QR bearer secrets are now hashed at rest.
 
 ## Upgrade Notes
 
