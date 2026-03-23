@@ -6,6 +6,18 @@ The format is based on Keep a Changelog and the project aims to follow Semantic 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-23
+
+### Added
+- Optional QR confirmation-code flow for stronger cross-device login confirmation.
+- Additional QR security guidance and throttling for scan, confirm, and complete routes.
+- Client-side UX helpers including `AuthClientError`, QR flow helpers, session observation, passkey sign-in strategy selection, and magic-link URL helpers.
+- End-to-end abort-signal support across the client transport and most client methods.
+
+### Changed
+- Client APIs are more ergonomic with optional options objects for cancellation and control.
+- QR client polling now supports backoff and jitter controls.
+
 ## [0.2.0] - 2026-03-23
 
 ### Added
