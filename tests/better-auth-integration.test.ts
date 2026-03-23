@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { betterAuth } from 'better-auth'
 import { memoryAdapter } from 'better-auth/adapters/memory'
 import { passkeyMagicPlugin } from '../src/better-auth/index.js'
+import { hashToken } from '../src/crypto.js'
 
 describe('better-auth integration', () => {
   let db: Record<string, any[]>
@@ -218,7 +219,7 @@ describe('better-auth integration', () => {
     expect(db.qrSession.length).toBe(1)
     expect(db.qrSession[0].id).toBe(sessionId)
     expect(db.qrSession[0].state).toBe('created')
-    expect(db.qrSession[0].statusToken).toBe(statusToken)
+    expect(db.qrSession[0].statusTokenHash).toBe(await hashToken(statusToken))
   })
 
   // ── Multiple operations ──

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createStorage } from 'unstorage'
 import { passkeyMagic, useAuth } from '../src/nitro/index.js'
+import { hashToken } from '../src/crypto.js'
 
 function createMockNitroApp() {
   const hooks = new Map<string, Function[]>()
@@ -134,7 +135,7 @@ describe('Nitro plugin', () => {
     const qrData = await storage.getItem(`myauth:qr:${sessionId}`)
     expect(qrData).toBeDefined()
     expect((qrData as any).state).toBe('created')
-    expect((qrData as any).statusToken).toBe(statusToken)
+    expect((qrData as any).statusTokenHash).toBe(await hashToken(statusToken))
   })
 
   it('supports magic link when email adapter is provided', () => {

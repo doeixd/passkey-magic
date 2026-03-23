@@ -86,8 +86,8 @@ const passkeyCredentialSchema = {
 const qrSessionSchema = {
   fields: {
     state: { type: 'string' as const, required: true },
-    statusToken: { type: 'string' as const, required: true },
-    confirmationCode: { type: 'string' as const, required: false },
+    statusTokenHash: { type: 'string' as const, required: true },
+    confirmationCodeHash: { type: 'string' as const, required: false },
     userId: { type: 'string' as const, required: false },
     sessionToken: { type: 'string' as const, required: false },
     expiresAt: { type: 'date' as const, required: true },
@@ -453,8 +453,8 @@ function createBridgedStorage<
         data: {
           id: session.id,
           state: session.state,
-          statusToken: session.statusToken,
-          confirmationCode: session.confirmationCode ?? null,
+          statusTokenHash: session.statusTokenHash,
+          confirmationCodeHash: session.confirmationCodeHash ?? null,
           userId: session.userId ?? null,
           sessionToken: session.sessionToken ?? null,
           expiresAt: session.expiresAt,
@@ -479,8 +479,8 @@ function createBridgedStorage<
         return {
           id: row.id,
           state: row.state,
-          statusToken: row.statusToken,
-          confirmationCode: row.confirmationCode ?? undefined,
+          statusTokenHash: row.statusTokenHash,
+          confirmationCodeHash: row.confirmationCodeHash ?? undefined,
           userId: row.userId ?? undefined,
           sessionToken: row.sessionToken ?? undefined,
           expiresAt: new Date(row.expiresAt),

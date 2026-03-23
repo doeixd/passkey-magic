@@ -1,4 +1,4 @@
-import { generateId as defaultGenerateId, generateToken, isValidEmail } from '../crypto.js'
+import { generateId as defaultGenerateId, generateToken, hashToken, isValidEmail } from '../crypto.js'
 import type { EmailAdapter, StorageAdapter, User } from '../types.js'
 
 /** Internal magic link manager used by `createAuth()`. */
@@ -25,7 +25,8 @@ export function createMagicLinkManager(
       }
 
       const token = generateToken(32)
-      await storage.storeMagicLink(token, email, opts.ttl)
+      const tokenHash = await hashToken(token)
+      await storage.storeMagicLink(tokenHash, email, opts.ttl)
 
       const url = `${opts.magicLinkURL}?token=${encodeURIComponent(token)}`
       await emailAdapter.sendMagicLink(email, url, token)
@@ -38,13 +39,14 @@ export function createMagicLinkManager(
         throw new Error('Invalid magic link token')
       }
 
-      const entry = await storage.getMagicLink(token)
+      const tokenHash = await hashToken(token)
+      const entry = await storage.getMagicLink(tokenHash)
       if (!entry) {
         throw new Error('Magic link expired or invalid')
       }
 
       // Single-use: delete immediately
-      await storage.deleteMagicLink(token)
+      await storage.deleteMagicLink(tokenHash)
 
       let user = await storage.getUserByEmail(entry.email)
       let isNewUser = false

@@ -24,10 +24,10 @@ export function base64url(buffer: Uint8Array): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
 }
 
-/** SHA-256 hash a string and return the digest as base64url. */
+/** SHA-512 hash a string and return the digest as base64url. */
 export async function hashToken(token: string): Promise<string> {
   const data = encoder.encode(token)
-  const hash = await crypto.subtle.digest('SHA-256', data)
+  const hash = await crypto.subtle.digest('SHA-512', data)
   return base64url(new Uint8Array(hash))
 }
 

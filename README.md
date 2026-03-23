@@ -390,6 +390,12 @@ Recommended setup:
 - configure Better Auth `advanced.crossSubDomainCookies` only when needed
 - use Better Auth secure cookie settings in production
 
+Secret storage notes:
+
+- magic-link bearer tokens are stored hashed at rest
+- QR `statusToken` values are stored hashed at rest
+- optional QR confirmation codes are stored hashed at rest
+
 Example:
 
 ```ts

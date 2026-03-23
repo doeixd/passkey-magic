@@ -1,4 +1,4 @@
-import { generateId as defaultGenerateId, generateToken, timingSafeEqual } from '../crypto.js'
+import { generateId as defaultGenerateId, generateToken, hashToken, timingSafeEqual } from '../crypto.js'
 import type { QRSession, QRSessionStatus, StorageAdapter } from '../types.js'
 
 export interface QRSessionManager {
@@ -39,7 +39,8 @@ export function createQRSessionManager(
 
   async function requireStatusToken(sessionId: string, statusToken: string): Promise<QRSession> {
     const session = await getLiveSession(sessionId)
-    if (!statusToken || !(await timingSafeEqual(session.statusToken, statusToken))) {
+    const statusTokenHash = await hashToken(statusToken)
+    if (!statusToken || !(await timingSafeEqual(session.statusTokenHash, statusTokenHash))) {
       throw new Error('Invalid QR session token')
     }
     return session
@@ -47,23 +48,25 @@ export function createQRSessionManager(
 
   return {
     async create() {
+      const statusToken = generateToken(24)
+      const confirmationCode = confirmationEnabled ? generateConfirmationCode(confirmationLength) : undefined
       const session: QRSession = {
         id: generateId(),
         state: 'created',
-        statusToken: generateToken(24),
-        confirmationCode: confirmationEnabled ? generateConfirmationCode(confirmationLength) : undefined,
+        statusTokenHash: await hashToken(statusToken),
+        confirmationCodeHash: confirmationCode ? await hashToken(confirmationCode) : undefined,
         expiresAt: new Date(Date.now() + opts.ttl),
         createdAt: new Date(),
       }
       await storage.createQRSession(session)
-      return { sessionId: session.id, statusToken: session.statusToken, confirmationCode: session.confirmationCode }
+      return { sessionId: session.id, statusToken, confirmationCode }
     },
 
     async getStatus(sessionId, statusToken) {
       const session = await requireStatusToken(sessionId, statusToken)
 
       const status: QRSessionStatus = { state: session.state }
-      if (session.confirmationCode) {
+      if (session.confirmationCodeHash) {
         status.confirmationRequired = true
         status.confirmed = !!session.confirmedAt
       }
@@ -87,12 +90,13 @@ export function createQRSessionManager(
 
     async confirm(sessionId, confirmationCode) {
       const session = await getLiveSession(sessionId)
-      if (!session.confirmationCode) return
+      if (!session.confirmationCodeHash) return
       if (session.confirmedAt) return
       if (session.state !== 'scanned' && session.state !== 'challenged') {
         throw new Error(`QR session is ${session.state}, cannot confirm`)
       }
-      if (!(await timingSafeEqual(session.confirmationCode, confirmationCode))) {
+      const confirmationCodeHash = await hashToken(confirmationCode)
+      if (!(await timingSafeEqual(session.confirmationCodeHash, confirmationCodeHash))) {
         throw new Error('Invalid QR confirmation code')
       }
       await storage.updateQRSession(sessionId, { confirmedAt: new Date() })
@@ -104,7 +108,7 @@ export function createQRSessionManager(
       if (session.state !== 'scanned') {
         throw new Error(`QR session is ${session.state}, cannot begin challenge`)
       }
-      if (session.confirmationCode && !session.confirmedAt) {
+      if (session.confirmationCodeHash && !session.confirmedAt) {
         throw new Error('QR session requires confirmation before challenge')
       }
       await storage.updateQRSession(sessionId, {
@@ -118,7 +122,7 @@ export function createQRSessionManager(
       if (session.state !== 'scanned' && session.state !== 'challenged') {
         throw new Error(`QR session is ${session.state}, cannot complete`)
       }
-      if (session.confirmationCode && !session.confirmedAt) {
+      if (session.confirmationCodeHash && !session.confirmedAt) {
         throw new Error('QR session requires confirmation before completion')
       }
       await storage.updateQRSession(sessionId, {
