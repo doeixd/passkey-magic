@@ -682,6 +682,86 @@ describe('createAuth', () => {
       expect(body.sessions).toHaveLength(2)
     })
 
+    it('supports client-compatible mutation aliases', async () => {
+      const auth = makeAuth()
+      const handler = auth.createHandler()
+
+      await storage.createUser({ id: 'u1', email: 'a@b.com', createdAt: new Date() })
+      await storage.createCredential({
+        id: 'c1', userId: 'u1', publicKey: new Uint8Array([1]), counter: 0,
+        deviceType: 'singleDevice', backedUp: false, createdAt: new Date(),
+      })
+      await storage.createCredential({
+        id: 'c2', userId: 'u1', publicKey: new Uint8Array([2]), counter: 0,
+        deviceType: 'singleDevice', backedUp: false, createdAt: new Date(),
+      })
+      await storage.createSession({
+        id: 's1', token: 'tok1', userId: 'u1', authMethod: 'passkey',
+        expiresAt: new Date(Date.now() + 10000), createdAt: new Date(),
+      })
+      await storage.createSession({
+        id: 's2', token: 'tok2', userId: 'u1', authMethod: 'passkey',
+        expiresAt: new Date(Date.now() + 10000), createdAt: new Date(),
+      })
+
+      const updateRes = await handler(new Request('http://localhost/auth/account/credentials/c1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer tok1' },
+        body: JSON.stringify({ label: 'Updated label' }),
+      }))
+      expect(updateRes.status).toBe(200)
+
+      const deleteCredRes = await handler(new Request('http://localhost/auth/account/credentials/c2/delete', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer tok1' },
+      }))
+      expect(deleteCredRes.status).toBe(200)
+
+      const revokeSessionRes = await handler(new Request('http://localhost/auth/account/sessions/s2/delete', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer tok1' },
+      }))
+      expect(revokeSessionRes.status).toBe(200)
+
+      const revokeCurrentRes = await handler(new Request('http://localhost/auth/session/revoke', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer tok1' },
+      }))
+      expect(revokeCurrentRes.status).toBe(200)
+    })
+
+    it('prevents cross-account credential and session mutations', async () => {
+      const auth = makeAuth()
+      const handler = auth.createHandler()
+
+      await storage.createUser({ id: 'u1', createdAt: new Date() })
+      await storage.createUser({ id: 'u2', email: 'b@b.com', createdAt: new Date() })
+      await storage.createCredential({
+        id: 'other-cred', userId: 'u2', publicKey: new Uint8Array([9]), counter: 0,
+        deviceType: 'singleDevice', backedUp: false, createdAt: new Date(),
+      })
+      await storage.createSession({
+        id: 'own-session', token: 'own-token', userId: 'u1', authMethod: 'passkey',
+        expiresAt: new Date(Date.now() + 10000), createdAt: new Date(),
+      })
+      await storage.createSession({
+        id: 'other-session', token: 'other-token', userId: 'u2', authMethod: 'passkey',
+        expiresAt: new Date(Date.now() + 10000), createdAt: new Date(),
+      })
+
+      const credRes = await handler(new Request('http://localhost/auth/account/credentials/other-cred/delete', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer own-token' },
+      }))
+      expect(credRes.status).toBe(404)
+
+      const sessionRes = await handler(new Request('http://localhost/auth/account/sessions/other-session/delete', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer own-token' },
+      }))
+      expect(sessionRes.status).toBe(404)
+    })
+
     it('deletes account via handler', async () => {
       const auth = makeAuth()
       const handler = auth.createHandler()

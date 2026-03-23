@@ -628,6 +628,11 @@ export function passkeyMagicPlugin(options: PasskeyMagicPluginOptions) {
         },
         async (ctx) => {
           const auth = getAuth(ctx)
+          const userId = ctx.context.session.user.id
+          const credentials = await auth.getUserCredentials(userId)
+          if (!credentials.some((credential) => credential.id === ctx.body.credentialId)) {
+            throw new APIError('NOT_FOUND', { message: 'Credential not found' })
+          }
           await auth.updateCredential({
             credentialId: ctx.body.credentialId,
             label: ctx.body.label,
@@ -647,6 +652,11 @@ export function passkeyMagicPlugin(options: PasskeyMagicPluginOptions) {
         },
         async (ctx) => {
           const auth = getAuth(ctx)
+          const userId = ctx.context.session.user.id
+          const credentials = await auth.getUserCredentials(userId)
+          if (!credentials.some((credential) => credential.id === ctx.body.credentialId)) {
+            throw new APIError('NOT_FOUND', { message: 'Credential not found' })
+          }
           await auth.removeCredential(ctx.body.credentialId)
           return ctx.json({ success: true })
         },

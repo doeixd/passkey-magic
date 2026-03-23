@@ -31,18 +31,24 @@ interface HandlerOptions {
  * POST /qr/:id/complete             — Complete QR session
  * GET  /session                      — Validate current session (Bearer token)
  * DELETE /session                    — Revoke current session (Bearer token)
+ * POST /session/revoke               — Revoke current session (client compatibility)
  * GET  /account                      — Get current user (authed)
  * GET  /account/sessions             — List user sessions (authed)
  * DELETE /account/sessions/:id       — Revoke specific session (authed)
+ * POST /account/sessions/:id/delete  — Revoke specific session (client compatibility)
  * DELETE /account/sessions           — Revoke all sessions (authed)
+ * POST /account/sessions/delete-all  — Revoke all sessions (client compatibility)
  * GET  /account/credentials          — List user passkeys (authed)
  * PATCH /account/credentials/:id     — Update passkey label (authed)
+ * POST /account/credentials/:id      — Update passkey label (client compatibility)
  * DELETE /account/credentials/:id    — Remove passkey (authed)
+ * POST /account/credentials/:id/delete — Remove passkey (client compatibility)
  * POST /account/link-email           — Link email to account (authed)
  * POST /account/unlink-email         — Unlink email from account (authed)
  * POST /account/can-link-email       — Check if current user can link email (authed)
  * POST /account/email-available      — Check email availability
  * DELETE /account                    — Delete account (authed)
+ * POST /account/delete               — Delete account (client compatibility)
  * ```
  */
 export function createHandler(
@@ -206,6 +212,13 @@ export function createHandler(
         return json({ ok: true })
       }
 
+      if (path === '/session/revoke' && request.method === 'POST') {
+        const token = extractBearerToken(request)
+        if (!token) return json({ error: 'No session token' }, 401)
+        await auth.revokeSession(token)
+        return json({ ok: true })
+      }
+
       // ── Account (all require auth) ──
 
       if (path === '/account' && request.method === 'GET') {
@@ -214,6 +227,12 @@ export function createHandler(
       }
 
       if (path === '/account' && request.method === 'DELETE') {
+        const { user } = await requireAuth(request)
+        await auth.deleteAccount(user.id)
+        return json({ ok: true })
+      }
+
+      if (path === '/account/delete' && request.method === 'POST') {
         const { user } = await requireAuth(request)
         await auth.deleteAccount(user.id)
         return json({ ok: true })
@@ -231,10 +250,31 @@ export function createHandler(
         return json({ ok: true })
       }
 
+      if (path === '/account/sessions/delete-all' && request.method === 'POST') {
+        const { user } = await requireAuth(request)
+        await auth.revokeAllSessions(user.id)
+        return json({ ok: true })
+      }
+
       const sessionDeleteMatch = path.match(/^\/account\/sessions\/([^/]+)$/)
       if (sessionDeleteMatch && request.method === 'DELETE') {
-        await requireAuth(request)
+        const { user } = await requireAuth(request)
+        const sessions = await auth.getUserSessions(user.id)
+        if (!sessions.some((session) => session.id === sessionDeleteMatch[1])) {
+          throw new HttpError(404, 'Session not found')
+        }
         await auth.revokeSessionById(sessionDeleteMatch[1])
+        return json({ ok: true })
+      }
+
+      const sessionDeleteAliasMatch = path.match(/^\/account\/sessions\/([^/]+)\/delete$/)
+      if (sessionDeleteAliasMatch && request.method === 'POST') {
+        const { user } = await requireAuth(request)
+        const sessions = await auth.getUserSessions(user.id)
+        if (!sessions.some((session) => session.id === sessionDeleteAliasMatch[1])) {
+          throw new HttpError(404, 'Session not found')
+        }
+        await auth.revokeSessionById(sessionDeleteAliasMatch[1])
         return json({ ok: true })
       }
 
@@ -245,8 +285,12 @@ export function createHandler(
       }
 
       const credPatchMatch = path.match(/^\/account\/credentials\/([^/]+)$/)
-      if (credPatchMatch && request.method === 'PATCH') {
-        await requireAuth(request)
+      if (credPatchMatch && (request.method === 'PATCH' || request.method === 'POST')) {
+        const { user } = await requireAuth(request)
+        const credentials = await auth.getUserCredentials(user.id)
+        if (!credentials.some((credential) => credential.id === credPatchMatch[1])) {
+          throw new HttpError(404, 'Credential not found')
+        }
         const body = await readJSON(request)
         await auth.updateCredential({
           credentialId: credPatchMatch[1],
@@ -257,8 +301,23 @@ export function createHandler(
 
       const credDeleteMatch = path.match(/^\/account\/credentials\/([^/]+)$/)
       if (credDeleteMatch && request.method === 'DELETE') {
-        await requireAuth(request)
+        const { user } = await requireAuth(request)
+        const credentials = await auth.getUserCredentials(user.id)
+        if (!credentials.some((credential) => credential.id === credDeleteMatch[1])) {
+          throw new HttpError(404, 'Credential not found')
+        }
         await auth.removeCredential(credDeleteMatch[1])
+        return json({ ok: true })
+      }
+
+      const credDeleteAliasMatch = path.match(/^\/account\/credentials\/([^/]+)\/delete$/)
+      if (credDeleteAliasMatch && request.method === 'POST') {
+        const { user } = await requireAuth(request)
+        const credentials = await auth.getUserCredentials(user.id)
+        if (!credentials.some((credential) => credential.id === credDeleteAliasMatch[1])) {
+          throw new HttpError(404, 'Credential not found')
+        }
+        await auth.removeCredential(credDeleteAliasMatch[1])
         return json({ ok: true })
       }
 
