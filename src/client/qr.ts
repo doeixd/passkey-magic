@@ -12,7 +12,7 @@ export interface ClientQRManager {
   pollSession(
     sessionId: string,
     statusToken: string,
-    opts?: { interval?: number; signal?: AbortSignal },
+    opts?: { interval?: number; signal?: AbortSignal; backoffRate?: number; maxInterval?: number; jitter?: number },
   ): AsyncIterable<QRSessionStatus>
   waitForAuthentication(
     sessionId: string,
@@ -39,8 +39,12 @@ export function createClientQRManager(config: ClientConfig): ClientQRManager {
     },
 
     async *pollSession(sessionId, statusToken, opts) {
-      const interval = opts?.interval ?? 2000
+      const baseInterval = opts?.interval ?? 2000
+      const backoffRate = Math.max(1, opts?.backoffRate ?? 1)
+      const maxInterval = Math.max(baseInterval, opts?.maxInterval ?? baseInterval)
+      const jitter = Math.max(0, Math.min(1, opts?.jitter ?? 0))
       const signal = opts?.signal
+      let attempt = 0
 
       while (!signal?.aborted) {
         const status = await config.request<QRSessionStatus>(`/qr/${sessionId}/status?token=${encodeURIComponent(statusToken)}`)
@@ -54,8 +58,14 @@ export function createClientQRManager(config: ClientConfig): ClientQRManager {
           return
         }
 
+        const nextInterval = Math.min(maxInterval, Math.round(baseInterval * Math.pow(backoffRate, attempt)))
+        const randomizedInterval = jitter > 0
+          ? Math.max(0, Math.round(nextInterval * (1 - jitter + Math.random() * jitter * 2)))
+          : nextInterval
+        attempt += 1
+
         await new Promise<void>((resolve, reject) => {
-          const timer = setTimeout(resolve, interval)
+          const timer = setTimeout(resolve, randomizedInterval)
           signal?.addEventListener('abort', () => {
             clearTimeout(timer)
             reject(signal.reason)

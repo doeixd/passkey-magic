@@ -170,4 +170,31 @@ describe('createClient grouped helpers', () => {
     await client.confirmQRSession({ sessionId: 'qr1', confirmationCode: '123456' })
     expect(request).toHaveBeenCalledWith('/qr/qr1/confirm', { confirmationCode: '123456' })
   })
+
+  it('provides QR flow, session observer, and sign-in strategy helpers', async () => {
+    const request = vi.fn(async (endpoint: string) => {
+      if (endpoint === '/qr/create') {
+        return { sessionId: 'qr2', statusToken: 'status2', confirmationCode: '654321' }
+      }
+      if (endpoint === '/session') {
+        return null
+      }
+      throw new Error(`Unexpected endpoint: ${endpoint}`)
+    })
+
+    const client = createClient({ request: request as any })
+    const flow = await client.qr.createFlow({ urlBuilder: (id) => `https://example.com/qr/${id}` })
+    expect(flow.render()).toContain('svg')
+    expect(flow.renderText()).toContain('█')
+    expect(flow.confirmationCode).toBe('654321')
+
+    const method = await client.getBestSignInMethod()
+    expect(['passkey', 'passkey-autofill', 'magic-link']).toContain(method)
+
+    const listener = vi.fn()
+    const unsubscribe = client.observeSession(listener, { immediate: false, intervalMs: 1 })
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    unsubscribe()
+    expect(listener).toHaveBeenCalled()
+  })
 })

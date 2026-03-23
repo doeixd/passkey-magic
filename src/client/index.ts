@@ -4,6 +4,21 @@ import { createClientQRManager } from './qr.js'
 import { createClientMagicLinkManager } from './magic-link.js'
 
 type ClientUser<TUserMetadata extends MetadataObject> = Pick<User<TUserMetadata>, 'id' | 'email' | 'metadata'>
+type SessionObserverOptions = { intervalMs?: number; immediate?: boolean }
+type SessionListener<TUserMetadata extends MetadataObject> = (session: { user: User<TUserMetadata>; session: Session } | null) => void
+
+export interface QRClientFlow {
+  sessionId: string
+  statusToken: string
+  confirmationCode?: string
+  render(opts?: { border?: number }): string
+  renderText(opts?: { border?: number }): string
+  poll(opts?: { interval?: number; signal?: AbortSignal; backoffRate?: number; maxInterval?: number; jitter?: number }): AsyncIterable<QRSessionStatus>
+  waitForAuthentication(opts?: { interval?: number; signal?: AbortSignal; timeoutMs?: number }): Promise<{ token: string; expiresAt: string }>
+  cancel(): Promise<void>
+}
+
+export type PasskeySignInMethod = 'passkey-autofill' | 'passkey' | 'magic-link'
 
 export class AuthClientError extends Error {
   code: 'AUTH_CLIENT_ERROR'
@@ -67,7 +82,7 @@ export interface PasskeyMagicClient<
     render(url: string, opts?: { border?: number }): string
     renderText(url: string, opts?: { border?: number }): string
     /** Poll QR status with the desktop-only `statusToken`. */
-    poll(sessionId: string, statusToken: string, opts?: { interval?: number; signal?: AbortSignal }): AsyncIterable<QRSessionStatus>
+    poll(sessionId: string, statusToken: string, opts?: { interval?: number; signal?: AbortSignal; backoffRate?: number; maxInterval?: number; jitter?: number }): AsyncIterable<QRSessionStatus>
     /** Wait until QR authentication completes or terminally fails. */
     waitForAuthentication(
       sessionId: string,
@@ -78,6 +93,7 @@ export interface PasskeyMagicClient<
     confirm(params: { sessionId: string; confirmationCode: string }): Promise<void>
     complete(params: { sessionId: string; confirmationCode?: string }): Promise<void>
     cancel(params: { sessionId: string; statusToken: string }): Promise<void>
+    createFlow(params?: { urlBuilder?: (sessionId: string) => string }): Promise<QRClientFlow>
   }
 
   magicLinks: {
@@ -115,6 +131,8 @@ export interface PasskeyMagicClient<
   supportsAutofill(): Promise<boolean>
   /** Check if a platform authenticator (Touch ID, Windows Hello) is available. */
   hasPlatformAuthenticator(): Promise<boolean>
+  /** Infer the best sign-in method for the current browser. */
+  getBestSignInMethod(opts?: { allowMagicLink?: boolean }): Promise<PasskeySignInMethod>
 
   /** Register a new passkey and create an account. */
   registerPasskey(params?: {
@@ -164,7 +182,7 @@ export interface PasskeyMagicClient<
   pollQRSession(
     sessionId: string,
     statusToken: string,
-    opts?: { interval?: number; signal?: AbortSignal },
+    opts?: { interval?: number; signal?: AbortSignal; backoffRate?: number; maxInterval?: number; jitter?: number },
   ): AsyncIterable<QRSessionStatus>
   /** Wait for QR authentication to succeed or fail terminally. */
   waitForQRSession(
@@ -203,6 +221,8 @@ export interface PasskeyMagicClient<
 
   /** Validate the current session. Returns null if invalid/expired. */
   getSession(): Promise<{ user: User<TUserMetadata>; session: Session } | null>
+  /** Observe session changes by polling `getSession()`. Returns an unsubscribe function. */
+  observeSession(listener: SessionListener<TUserMetadata>, opts?: SessionObserverOptions): () => void
   /** List all active sessions. */
   listSessions(): Promise<{ sessions: Session[] }>
   /** Revoke the current session (logout). */
@@ -265,6 +285,20 @@ export function createClient<
   const qr = createClientQRManager({ request })
   const magicLink = createClientMagicLinkManager({ request })
 
+  function createQRFlow(sessionId: string, statusToken: string, confirmationCode?: string, urlBuilder?: (sessionId: string) => string): QRClientFlow {
+    const builder = urlBuilder ?? ((id: string) => id)
+    return {
+      sessionId,
+      statusToken,
+      confirmationCode,
+      render: (opts) => qr.renderSVG(builder(sessionId), opts),
+      renderText: (opts) => qr.renderText(builder(sessionId), opts),
+      poll: (opts) => qr.pollSession(sessionId, statusToken, opts),
+      waitForAuthentication: (opts) => qr.waitForAuthentication(sessionId, statusToken, opts),
+      cancel: () => qr.cancelSession({ sessionId, statusToken }),
+    }
+  }
+
   const client: PasskeyMagicClient<TUserMetadata, TCredentialMetadata> = {
     passkeys: {
       register: (params) => passkey.register(params),
@@ -294,6 +328,10 @@ export function createClient<
       confirm: (params) => qr.confirmSession(params),
       complete: (params) => qr.completeSession(params),
       cancel: (params) => qr.cancelSession(params),
+      async createFlow(params) {
+        const created = await qr.createSession()
+        return createQRFlow(created.sessionId, created.statusToken, created.confirmationCode, params?.urlBuilder)
+      },
     },
     magicLinks: {
       request: (params) => magicLink.send(params),
@@ -320,6 +358,13 @@ export function createClient<
     supportsPasskeys: () => passkey.supportsPasskeys(),
     supportsAutofill: () => passkey.supportsAutofill(),
     hasPlatformAuthenticator: () => passkey.hasPlatformAuthenticator(),
+    async getBestSignInMethod(opts) {
+      if (!passkey.supportsPasskeys()) {
+        return opts?.allowMagicLink === false ? 'passkey' : 'magic-link'
+      }
+      if (await passkey.supportsAutofill()) return 'passkey-autofill'
+      return 'passkey'
+    },
     registerPasskey: (params) => passkey.register(params),
     signInWithPasskey: (params) => passkey.authenticate(params),
 
@@ -362,6 +407,29 @@ export function createClient<
         return await request('/session')
       } catch {
         return null
+      }
+    },
+    observeSession(listener, opts) {
+      const intervalMs = opts?.intervalMs ?? 30_000
+      let timer: ReturnType<typeof setTimeout> | null = null
+      let active = true
+
+      const tick = async () => {
+        if (!active) return
+        listener(await client.getSession())
+        if (!active) return
+        timer = setTimeout(tick, intervalMs)
+      }
+
+      if (opts?.immediate !== false) {
+        void tick()
+      } else {
+        timer = setTimeout(tick, intervalMs)
+      }
+
+      return () => {
+        active = false
+        if (timer) clearTimeout(timer)
       }
     },
     listSessions: () => request('/account/sessions'),

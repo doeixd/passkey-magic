@@ -86,6 +86,16 @@ try {
 const session = await auth.waitForQRSession(sessionId, statusToken)
 const token = auth.extractMagicLinkToken(window.location.href)
 await auth.verifyMagicLinkURL({ url: window.location.href })
+
+const flow = await auth.qr.createFlow({
+  urlBuilder: (sessionId) => `https://example.com/auth/qr/${sessionId}`,
+})
+
+const unsubscribe = auth.observeSession((current) => {
+  console.log('session changed', current)
+}, { intervalMs: 30_000 })
+
+const method = await auth.getBestSignInMethod()
 ```
 
 ## Features
