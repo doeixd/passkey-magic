@@ -210,6 +210,12 @@ await auth.revokeSession(token)
 await auth.revokeAllSessions(userId)
 ```
 
+On the client, session validation uses the authenticated request transport directly:
+
+```ts
+const current = await auth.getSession()
+```
+
 ### Lifecycle Hooks
 
 ```ts

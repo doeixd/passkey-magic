@@ -131,7 +131,7 @@ export interface PasskeyMagicClient {
   // ── Session Management ──
 
   /** Validate the current session. Returns null if invalid/expired. */
-  getSession(token: string): Promise<{ user: User; session: Session } | null>
+  getSession(): Promise<{ user: User; session: Session } | null>
   /** List all active sessions. */
   listSessions(): Promise<{ sessions: Session[] }>
   /** Revoke the current session (logout). */
@@ -264,7 +264,7 @@ export function createClient(config: ClientConfig): PasskeyMagicClient {
     verifyMagicLink: (params) => magicLink.verify(params),
 
     // Session
-    async getSession(token) {
+    async getSession() {
       try {
         return await config.request('/session')
       } catch {

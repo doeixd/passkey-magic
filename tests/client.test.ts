@@ -50,4 +50,29 @@ describe('createClient grouped helpers', () => {
     expect(request).toHaveBeenCalledWith('/account/unlink-email', {})
     expect(request).toHaveBeenCalledWith('/account/delete', {})
   })
+
+  it('validates the current session without requiring a token argument', async () => {
+    const request = vi.fn(async (endpoint: string) => {
+      if (endpoint === '/session') {
+        return {
+          user: { id: 'u1', createdAt: new Date() },
+          session: {
+            id: 's1',
+            token: 'session-token',
+            userId: 'u1',
+            authMethod: 'passkey',
+            createdAt: new Date(),
+            expiresAt: new Date(Date.now() + 1000),
+          },
+        }
+      }
+      throw new Error(`Unexpected endpoint: ${endpoint}`)
+    })
+
+    const client = createClient({ request: request as any })
+    const result = await client.getSession()
+
+    expect(result?.user.id).toBe('u1')
+    expect(request).toHaveBeenCalledWith('/session')
+  })
 })
