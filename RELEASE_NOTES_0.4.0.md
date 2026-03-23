@@ -1,4 +1,4 @@
-# passkey-magic 0.3.0
+# passkey-magic 0.4.0
 
 This release builds on `0.2.0` with stronger QR login protection and significantly better frontend ergonomics.
 
