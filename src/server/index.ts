@@ -50,14 +50,14 @@ export interface PasskeyNamespace {
 }
 
 export interface QRNamespace {
-  create(): Promise<{ sessionId: string }>
-  getStatus(sessionId: string): Promise<QRSessionStatus>
+  create(): Promise<{ sessionId: string; statusToken: string }>
+  getStatus(params: { sessionId: string; statusToken: string }): Promise<QRSessionStatus>
   markScanned(sessionId: string): Promise<void>
   complete(params: {
     sessionId: string
     response: AuthenticationResponseJSON
   }): Promise<AuthResult & { method: 'qr' }>
-  cancel(sessionId: string): Promise<void>
+  cancel(params: { sessionId: string; statusToken: string }): Promise<void>
 }
 
 export interface MagicLinkNamespace {
@@ -161,16 +161,16 @@ export interface BaseAuthMethods {
   // ── QR Cross-Device ──
 
   /** Create a new QR login session. Returns a `sessionId` to encode in a QR code. */
-  createQRSession(): Promise<{ sessionId: string }>
+  createQRSession(): Promise<{ sessionId: string; statusToken: string }>
 
   /** Poll the status of a QR session. */
-  getQRSessionStatus(sessionId: string): Promise<QRSessionStatus>
+  getQRSessionStatus(params: { sessionId: string; statusToken: string }): Promise<QRSessionStatus>
 
   /** Mark a QR session as scanned (called from the phone after scanning). */
   markQRSessionScanned(sessionId: string): Promise<void>
 
   /** Cancel a QR session before it completes. */
-  cancelQRSession(sessionId: string): Promise<void>
+  cancelQRSession(params: { sessionId: string; statusToken: string }): Promise<void>
 
   /**
    * Complete a QR session — authenticates on the phone, creates a session
@@ -422,8 +422,8 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
       return qrSessions.create()
     },
 
-    async getQRSessionStatus(sessionId) {
-      return qrSessions.getStatus(sessionId)
+    async getQRSessionStatus({ sessionId, statusToken }) {
+      return qrSessions.getStatus(sessionId, statusToken)
     },
 
     async markQRSessionScanned(sessionId) {
@@ -431,8 +431,8 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
       emitter.emit('qr:scanned', { sessionId })
     },
 
-    async cancelQRSession(sessionId) {
-      await qrSessions.cancel(sessionId)
+    async cancelQRSession({ sessionId, statusToken }) {
+      await qrSessions.cancel(sessionId, statusToken)
     },
 
     async completeQRSession({ sessionId, response }) {
@@ -584,10 +584,10 @@ export function createAuth<TEmail extends EmailAdapter | undefined = undefined>(
 
   base.qr = {
     create: () => base.createQRSession(),
-    getStatus: (sessionId) => base.getQRSessionStatus(sessionId),
+    getStatus: (params) => base.getQRSessionStatus(params),
     markScanned: (sessionId) => base.markQRSessionScanned(sessionId),
     complete: (params) => base.completeQRSession(params),
-    cancel: (sessionId) => base.cancelQRSession(sessionId),
+    cancel: (params) => base.cancelQRSession(params),
   }
 
   base.accounts = {

@@ -176,7 +176,9 @@ export function createHandler(
 
       const qrStatusMatch = path.match(/^\/qr\/([^/]+)\/status$/)
       if (qrStatusMatch && request.method === 'GET') {
-        return json(await auth.getQRSessionStatus(qrStatusMatch[1]))
+        const statusToken = url.searchParams.get('token')
+        if (!statusToken) throw new HttpError(401, 'QR session token required')
+        return json(await auth.getQRSessionStatus({ sessionId: qrStatusMatch[1], statusToken }))
       }
 
       const qrScannedMatch = path.match(/^\/qr\/([^/]+)\/scanned$/)
@@ -187,7 +189,11 @@ export function createHandler(
 
       const qrCancelMatch = path.match(/^\/qr\/([^/]+)\/cancel$/)
       if (qrCancelMatch && request.method === 'POST') {
-        await auth.cancelQRSession(qrCancelMatch[1])
+        const body = await readJSON(request)
+        await auth.cancelQRSession({
+          sessionId: qrCancelMatch[1],
+          statusToken: expectString(body, 'statusToken'),
+        })
         return json({ ok: true })
       }
 

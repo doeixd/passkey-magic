@@ -27,12 +27,12 @@ export interface PasskeyMagicClient {
   }
 
   qr: {
-    create(): Promise<{ sessionId: string }>
+    create(): Promise<{ sessionId: string; statusToken: string }>
     render(url: string, opts?: { border?: number }): string
     renderText(url: string, opts?: { border?: number }): string
-    poll(sessionId: string, opts?: { interval?: number; signal?: AbortSignal }): AsyncIterable<QRSessionStatus>
+    poll(sessionId: string, statusToken: string, opts?: { interval?: number; signal?: AbortSignal }): AsyncIterable<QRSessionStatus>
     complete(params: { sessionId: string }): Promise<void>
-    cancel(sessionId: string): Promise<void>
+    cancel(params: { sessionId: string; statusToken: string }): Promise<void>
   }
 
   magicLinks: {
@@ -99,7 +99,7 @@ export interface PasskeyMagicClient {
   // ── QR Cross-Device ──
 
   /** Create a new QR login session on the server. */
-  createQRSession(): Promise<{ sessionId: string }>
+  createQRSession(): Promise<{ sessionId: string; statusToken: string }>
   /** Render a URL as an SVG QR code using uqr. */
   renderQR(url: string, opts?: { border?: number }): string
   /** Render a URL as a text QR code using uqr. */
@@ -110,12 +110,13 @@ export interface PasskeyMagicClient {
    */
   pollQRSession(
     sessionId: string,
+    statusToken: string,
     opts?: { interval?: number; signal?: AbortSignal },
   ): AsyncIterable<QRSessionStatus>
   /** Complete a QR session from the scanning device (authenticates with passkey). */
   completeQRSession(params: { sessionId: string }): Promise<void>
   /** Cancel a QR session before it completes. */
-  cancelQRSession(sessionId: string): Promise<void>
+  cancelQRSession(params: { sessionId: string; statusToken: string }): Promise<void>
 
   // ── Magic Link ──
 
@@ -208,9 +209,9 @@ export function createClient(config: ClientConfig): PasskeyMagicClient {
       create: () => qr.createSession(),
       render: (url, opts) => qr.renderSVG(url, opts),
       renderText: (url, opts) => qr.renderText(url, opts),
-      poll: (id, opts) => qr.pollSession(id, opts),
+      poll: (id, statusToken, opts) => qr.pollSession(id, statusToken, opts),
       complete: (params) => qr.completeSession(params),
-      cancel: (sessionId) => qr.cancelSession(sessionId),
+      cancel: (params) => qr.cancelSession(params),
     },
     magicLinks: {
       request: (params) => magicLink.send(params),
@@ -259,9 +260,9 @@ export function createClient(config: ClientConfig): PasskeyMagicClient {
     createQRSession: () => qr.createSession(),
     renderQR: (url, opts) => qr.renderSVG(url, opts),
     renderQRText: (url, opts) => qr.renderText(url, opts),
-    pollQRSession: (id, opts) => qr.pollSession(id, opts),
+    pollQRSession: (id, statusToken, opts) => qr.pollSession(id, statusToken, opts),
     completeQRSession: (params) => qr.completeSession(params),
-    cancelQRSession: (sessionId) => qr.cancelSession(sessionId),
+    cancelQRSession: (params) => qr.cancelSession(params),
 
     // Magic link
     requestMagicLink: (params) => magicLink.send(params),

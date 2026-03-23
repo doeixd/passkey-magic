@@ -6,21 +6,22 @@ import type { ClientConfig, QRSessionStatus } from '../types.js'
 
 /** Client-side QR cross-device login manager. */
 export interface ClientQRManager {
-  createSession(): Promise<{ sessionId: string }>
+  createSession(): Promise<{ sessionId: string; statusToken: string }>
   renderSVG(url: string, opts?: { border?: number }): string
   renderText(url: string, opts?: { border?: number }): string
   pollSession(
     sessionId: string,
+    statusToken: string,
     opts?: { interval?: number; signal?: AbortSignal },
   ): AsyncIterable<QRSessionStatus>
   completeSession(params: { sessionId: string }): Promise<void>
-  cancelSession(sessionId: string): Promise<void>
+  cancelSession(params: { sessionId: string; statusToken: string }): Promise<void>
 }
 
 export function createClientQRManager(config: ClientConfig): ClientQRManager {
   return {
     async createSession() {
-      return config.request<{ sessionId: string }>('/qr/create', {})
+      return config.request<{ sessionId: string; statusToken: string }>('/qr/create', {})
     },
 
     renderSVG(url, opts) {
@@ -31,12 +32,12 @@ export function createClientQRManager(config: ClientConfig): ClientQRManager {
       return renderUnicodeCompact(url, { border: opts?.border ?? 1 })
     },
 
-    async *pollSession(sessionId, opts) {
+    async *pollSession(sessionId, statusToken, opts) {
       const interval = opts?.interval ?? 2000
       const signal = opts?.signal
 
       while (!signal?.aborted) {
-        const status = await config.request<QRSessionStatus>(`/qr/${sessionId}/status`)
+        const status = await config.request<QRSessionStatus>(`/qr/${sessionId}/status?token=${encodeURIComponent(statusToken)}`)
         yield status
 
         if (
@@ -69,8 +70,8 @@ export function createClientQRManager(config: ClientConfig): ClientQRManager {
       await config.request(`/qr/${sessionId}/complete`, { response })
     },
 
-    async cancelSession(sessionId) {
-      await config.request(`/qr/${sessionId}/cancel`, {})
+    async cancelSession({ sessionId, statusToken }) {
+      await config.request(`/qr/${sessionId}/cancel`, { statusToken })
     },
   }
 }

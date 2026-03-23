@@ -181,12 +181,12 @@ describe('createAuth', () => {
 
     it('delegates qr aliases to base methods', async () => {
       const auth = makeAuth()
-      const { sessionId } = await auth.qr.create()
-      expect((await auth.qr.getStatus(sessionId)).state).toBe('created')
+      const { sessionId, statusToken } = await auth.qr.create()
+      expect((await auth.qr.getStatus({ sessionId, statusToken })).state).toBe('created')
       await auth.qr.markScanned(sessionId)
-      expect((await auth.getQRSessionStatus(sessionId)).state).toBe('scanned')
-      await auth.qr.cancel(sessionId)
-      expect((await auth.qr.getStatus(sessionId)).state).toBe('cancelled')
+      expect((await auth.getQRSessionStatus({ sessionId, statusToken })).state).toBe('scanned')
+      await auth.qr.cancel({ sessionId, statusToken })
+      expect((await auth.qr.getStatus({ sessionId, statusToken })).state).toBe('cancelled')
     })
 
     it('delegates magic link aliases to base methods', async () => {
@@ -563,10 +563,10 @@ describe('createAuth', () => {
       // Create
       const createRes = await handler(new Request('http://localhost/auth/qr/create', { method: 'POST' }))
       expect(createRes.status).toBe(200)
-      const { sessionId } = await createRes.json()
+      const { sessionId, statusToken } = await createRes.json()
 
       // Poll
-      const statusRes = await handler(new Request(`http://localhost/auth/qr/${sessionId}/status`))
+      const statusRes = await handler(new Request(`http://localhost/auth/qr/${sessionId}/status?token=${encodeURIComponent(statusToken)}`))
       expect(statusRes.status).toBe(200)
       expect((await statusRes.json()).state).toBe('created')
 
@@ -575,8 +575,36 @@ describe('createAuth', () => {
       expect(scanRes.status).toBe(200)
 
       // Cancel
-      const cancelRes = await handler(new Request(`http://localhost/auth/qr/${sessionId}/cancel`, { method: 'POST' }))
+      const cancelRes = await handler(new Request(`http://localhost/auth/qr/${sessionId}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({ statusToken }),
+        headers: { 'Content-Type': 'application/json' },
+      }))
       expect(cancelRes.status).toBe(200)
+    })
+
+    it('rejects QR status polling without the desktop status token', async () => {
+      const auth = makeAuth()
+      const handler = auth.createHandler()
+      const createRes = await handler(new Request('http://localhost/auth/qr/create', { method: 'POST' }))
+      const { sessionId } = await createRes.json()
+
+      const statusRes = await handler(new Request(`http://localhost/auth/qr/${sessionId}/status`))
+      expect(statusRes.status).toBe(401)
+    })
+
+    it('rejects QR cancellation with the wrong desktop status token', async () => {
+      const auth = makeAuth()
+      const handler = auth.createHandler()
+      const createRes = await handler(new Request('http://localhost/auth/qr/create', { method: 'POST' }))
+      const { sessionId } = await createRes.json()
+
+      const cancelRes = await handler(new Request(`http://localhost/auth/qr/${sessionId}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ statusToken: 'wrong-token' }),
+      }))
+      expect(cancelRes.status).toBe(400)
     })
 
     it('returns 400 for magic link when not configured', async () => {

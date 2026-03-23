@@ -110,8 +110,9 @@ describe('Nitro plugin', () => {
 
     // Simulate a QR session creation through the request hook
     const auth = useAuth()
-    const { sessionId } = await auth.createQRSession()
+    const { sessionId, statusToken } = await auth.createQRSession()
     expect(sessionId).toBeTruthy()
+    expect(statusToken).toBeTruthy()
   })
 
   it('uses unstorage for data persistence', async () => {
@@ -127,12 +128,13 @@ describe('Nitro plugin', () => {
     }).setup(nitroApp as any)
 
     const auth = useAuth()
-    const { sessionId } = await auth.createQRSession()
+    const { sessionId, statusToken } = await auth.createQRSession()
 
     // Verify the data is in unstorage under the correct prefix
     const qrData = await storage.getItem(`myauth:qr:${sessionId}`)
     expect(qrData).toBeDefined()
     expect((qrData as any).state).toBe('created')
+    expect((qrData as any).statusToken).toBe(statusToken)
   })
 
   it('supports magic link when email adapter is provided', () => {
@@ -181,7 +183,8 @@ describe('Nitro plugin', () => {
     }).setup(nitroApp as any)
 
     const auth = useAuth()
-    const { sessionId } = await auth.createQRSession()
+    const { sessionId, statusToken } = await auth.createQRSession()
     expect(sessionId).toBeTruthy()
+    expect(statusToken).toBeTruthy()
   })
 })

@@ -153,13 +153,13 @@ describe('passkeyMagicClientPlugin', () => {
     expect(actions?.passkeyMagic.accounts.canLinkEmail).toBeTypeOf('function')
     expect(actions?.passkeyMagic.accounts.updateMetadata).toBeTypeOf('function')
 
-    await actions?.passkeyMagic.qr.status('qr-1')
+    await actions?.passkeyMagic.qr.status('qr-1', 'status-token')
     await actions?.passkeyMagic.accounts.canLinkEmail({ email: 'user@example.com' })
     await actions?.passkeyMagic.accounts.updateMetadata({ metadata: { theme: 'dark' } })
 
     expect($fetch).toHaveBeenCalledWith('/passkey-magic/qr/status', {
       method: 'GET',
-      query: { sessionId: 'qr-1' },
+      query: { sessionId: 'qr-1', statusToken: 'status-token' },
     })
     expect($fetch).toHaveBeenCalledWith('/passkey-magic/account/can-link-email', {
       method: 'POST',

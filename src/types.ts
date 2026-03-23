@@ -62,6 +62,7 @@ export interface Session {
 export interface QRSession {
   id: string
   state: 'created' | 'scanned' | 'challenged' | 'authenticated' | 'expired' | 'cancelled'
+  statusToken: string
   userId?: string
   sessionToken?: string
   expiresAt: Date

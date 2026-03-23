@@ -5,7 +5,7 @@ import { passkeyMagicPlugin } from '../src/better-auth/index.js'
 
 describe('better-auth integration', () => {
   let db: Record<string, any[]>
-  let auth: ReturnType<typeof betterAuth>
+  let auth: any
 
   beforeEach(() => {
     db = {}
@@ -95,11 +95,11 @@ describe('better-auth integration', () => {
         body: JSON.stringify({}),
       }),
     )
-    const { sessionId } = await createRes.json()
+    const { sessionId, statusToken } = await createRes.json()
 
     // Now poll its status
     const statusRes = await auth.handler(
-      new Request(`http://localhost:3000/api/auth/passkey-magic/qr/status?sessionId=${sessionId}`, {
+      new Request(`http://localhost:3000/api/auth/passkey-magic/qr/status?sessionId=${sessionId}&statusToken=${encodeURIComponent(statusToken)}`, {
         method: 'GET',
       }),
     )
@@ -117,7 +117,7 @@ describe('better-auth integration', () => {
         body: JSON.stringify({}),
       }),
     )
-    const { sessionId } = await createRes.json()
+    const { sessionId, statusToken } = await createRes.json()
 
     // Mark it scanned
     const scanRes = await auth.handler(
@@ -131,12 +131,30 @@ describe('better-auth integration', () => {
 
     // Verify status changed
     const statusRes = await auth.handler(
-      new Request(`http://localhost:3000/api/auth/passkey-magic/qr/status?sessionId=${sessionId}`, {
+      new Request(`http://localhost:3000/api/auth/passkey-magic/qr/status?sessionId=${sessionId}&statusToken=${encodeURIComponent(statusToken)}`, {
         method: 'GET',
       }),
     )
     const status = await statusRes.json()
     expect(status.state).toBe('scanned')
+  })
+
+  it('GET /passkey-magic/qr/status rejects requests without status token', async () => {
+    const createRes = await auth.handler(
+      new Request('http://localhost:3000/api/auth/passkey-magic/qr/create', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      }),
+    )
+    const { sessionId } = await createRes.json()
+
+    const statusRes = await auth.handler(
+      new Request(`http://localhost:3000/api/auth/passkey-magic/qr/status?sessionId=${sessionId}`, {
+        method: 'GET',
+      }),
+    )
+    expect(statusRes.status).toBe(400)
   })
 
   it('POST /passkey-magic/magic-link/send fails gracefully without email adapter', async () => {
@@ -194,12 +212,13 @@ describe('better-auth integration', () => {
         body: JSON.stringify({}),
       }),
     )
-    const { sessionId } = await res.json()
+    const { sessionId, statusToken } = await res.json()
 
     expect(db.qrSession).toBeDefined()
     expect(db.qrSession.length).toBe(1)
     expect(db.qrSession[0].id).toBe(sessionId)
     expect(db.qrSession[0].state).toBe('created')
+    expect(db.qrSession[0].statusToken).toBe(statusToken)
   })
 
   // ── Multiple operations ──
@@ -213,11 +232,11 @@ describe('better-auth integration', () => {
         body: JSON.stringify({}),
       }),
     )
-    const { sessionId } = await createRes.json()
+    const { sessionId, statusToken } = await createRes.json()
 
     // Poll: created
     let statusRes = await auth.handler(
-      new Request(`http://localhost:3000/api/auth/passkey-magic/qr/status?sessionId=${sessionId}`, {
+      new Request(`http://localhost:3000/api/auth/passkey-magic/qr/status?sessionId=${sessionId}&statusToken=${encodeURIComponent(statusToken)}`, {
         method: 'GET',
       }),
     )
@@ -234,7 +253,7 @@ describe('better-auth integration', () => {
 
     // Poll: scanned
     statusRes = await auth.handler(
-      new Request(`http://localhost:3000/api/auth/passkey-magic/qr/status?sessionId=${sessionId}`, {
+      new Request(`http://localhost:3000/api/auth/passkey-magic/qr/status?sessionId=${sessionId}&statusToken=${encodeURIComponent(statusToken)}`, {
         method: 'GET',
       }),
     )

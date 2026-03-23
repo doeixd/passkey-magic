@@ -1,13 +1,13 @@
-import { generateId as defaultGenerateId } from '../crypto.js'
+import { generateId as defaultGenerateId, generateToken, timingSafeEqual } from '../crypto.js'
 import type { QRSession, QRSessionStatus, StorageAdapter } from '../types.js'
 
 export interface QRSessionManager {
-  create(): Promise<{ sessionId: string }>
-  getStatus(sessionId: string): Promise<QRSessionStatus>
+  create(): Promise<{ sessionId: string; statusToken: string }>
+  getStatus(sessionId: string, statusToken: string): Promise<QRSessionStatus>
   markScanned(sessionId: string): Promise<void>
   beginChallenge(sessionId: string): Promise<void>
   complete(sessionId: string, userId: string, sessionToken: string): Promise<void>
-  cancel(sessionId: string): Promise<void>
+  cancel(sessionId: string, statusToken: string): Promise<void>
 }
 
 export function createQRSessionManager(
@@ -34,20 +34,29 @@ export function createQRSessionManager(
     return session
   }
 
+  async function requireStatusToken(sessionId: string, statusToken: string): Promise<QRSession> {
+    const session = await getLiveSession(sessionId)
+    if (!statusToken || !(await timingSafeEqual(session.statusToken, statusToken))) {
+      throw new Error('Invalid QR session token')
+    }
+    return session
+  }
+
   return {
     async create() {
       const session: QRSession = {
         id: generateId(),
         state: 'created',
+        statusToken: generateToken(24),
         expiresAt: new Date(Date.now() + opts.ttl),
         createdAt: new Date(),
       }
       await storage.createQRSession(session)
-      return { sessionId: session.id }
+      return { sessionId: session.id, statusToken: session.statusToken }
     },
 
-    async getStatus(sessionId) {
-      const session = await getLiveSession(sessionId)
+    async getStatus(sessionId, statusToken) {
+      const session = await requireStatusToken(sessionId, statusToken)
 
       const status: QRSessionStatus = { state: session.state }
       if (session.state === 'authenticated' && session.sessionToken) {
@@ -93,8 +102,8 @@ export function createQRSessionManager(
       })
     },
 
-    async cancel(sessionId) {
-      const session = await getLiveSession(sessionId)
+    async cancel(sessionId, statusToken) {
+      const session = await requireStatusToken(sessionId, statusToken)
       if (session.state === 'cancelled') return
       if (isTerminal(session.state)) {
         throw new Error(`QR session is ${session.state}, cannot cancel`)

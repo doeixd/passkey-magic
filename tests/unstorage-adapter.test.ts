@@ -243,6 +243,7 @@ describe('unstorageAdapter', () => {
       await adapter.createQRSession({
         id: 'qr1',
         state: 'created',
+        statusToken: 'st1',
         expiresAt: new Date(Date.now() + 10000),
         createdAt: new Date(),
       })
@@ -255,6 +256,7 @@ describe('unstorageAdapter', () => {
       await adapter.createQRSession({
         id: 'qr2',
         state: 'challenged',
+        statusToken: 'st2',
         expiresAt: new Date(Date.now() - 1000),
         createdAt: new Date(),
       })
@@ -266,6 +268,7 @@ describe('unstorageAdapter', () => {
       await adapter.createQRSession({
         id: 'qr3',
         state: 'created',
+        statusToken: 'st3',
         expiresAt: new Date(Date.now() + 10000),
         createdAt: new Date(),
       })

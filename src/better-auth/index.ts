@@ -45,6 +45,7 @@ const passkeyCredentialSchema = {
 const qrSessionSchema = {
   fields: {
     state: { type: 'string' as const, required: true },
+    statusToken: { type: 'string' as const, required: true },
     userId: { type: 'string' as const, required: false },
     sessionToken: { type: 'string' as const, required: false },
     expiresAt: { type: 'date' as const, required: true },
@@ -403,6 +404,7 @@ function createBridgedStorage(adapter: BetterAuthAdapter): StorageAdapter {
         data: {
           id: session.id,
           state: session.state,
+          statusToken: session.statusToken,
           userId: session.userId ?? null,
           sessionToken: session.sessionToken ?? null,
           expiresAt: session.expiresAt,
@@ -426,6 +428,7 @@ function createBridgedStorage(adapter: BetterAuthAdapter): StorageAdapter {
         return {
           id: row.id,
           state: row.state,
+          statusToken: row.statusToken,
           userId: row.userId ?? undefined,
           sessionToken: row.sessionToken ?? undefined,
           expiresAt: new Date(row.expiresAt),
@@ -769,11 +772,15 @@ export function passkeyMagicPlugin(options: PasskeyMagicPluginOptions) {
           method: 'GET',
           query: z.object({
             sessionId: z.string(),
+            statusToken: z.string(),
           }),
         },
         async (ctx) => {
           const auth = getAuth(ctx)
-          const result = await auth.getQRSessionStatus(ctx.query.sessionId)
+          const result = await auth.getQRSessionStatus({
+            sessionId: ctx.query.sessionId,
+            statusToken: ctx.query.statusToken,
+          })
           return ctx.json(result)
         },
       ),
